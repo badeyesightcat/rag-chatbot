@@ -1,0 +1,30 @@
+version: "3.9"
+services:
+  api:
+    build: .
+    container_name: rag-learn-api
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - ./data:/app/data # persist SQLite + uploads
+    depends_on:
+      - qdrant
+      - redis
+
+  qdrant: # purpose-built vector DB
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333" # REST API + web dashboard
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  redis: # response cache only
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  qdrant_data:

@@ -1,0 +1,1670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RAG Chatbot — Learning Edition</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Fraunces:ital,wght@0,300;0,700;0,900;1,300&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --ink: #1a1a2e;
+  --paper: #f5f0e8;
+  --paper2: #ede8de;
+  --accent: #c84b31;
+  --accent2: #2e86ab;
+  --gold: #e8a838;
+  --green: #2d6a4f;
+  --muted: #7a7060;
+  --border: #cfc8b8;
+  --code-bg: #1a1a2e;
+  --code-text: #e8e0d0;
+  --phase1: #c84b31;
+  --phase2: #e8a838;
+  --phase3: #2e86ab;
+  --phase4: #2d6a4f;
+  --phase5: #7b5ea7;
+  --phase6: #d4522a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+/* HEADER */
+header {
+  background: var(--ink);
+  color: var(--paper);
+  padding: 64px 48px 56px;
+  position: relative;
+  overflow: hidden;
+}
+header::before {
+  content: '';
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 320px; height: 320px;
+  border: 1px solid rgba(200,75,49,.2);
+  border-radius: 50%;
+}
+header::after {
+  content: '';
+  position: absolute;
+  top: 20px; right: 60px;
+  width: 180px; height: 180px;
+  border: 1px solid rgba(200,75,49,.15);
+  border-radius: 50%;
+}
+.header-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 20px;
+}
+header h1 {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(36px, 6vw, 72px);
+  font-weight: 900;
+  line-height: 1.0;
+  margin-bottom: 20px;
+}
+header h1 em {
+  font-style: italic;
+  font-weight: 300;
+  color: var(--gold);
+}
+header p {
+  color: rgba(245,240,232,.65);
+  max-width: 560px;
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1.6;
+}
+.header-meta {
+  margin-top: 32px;
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.meta-chip {
+  background: rgba(245,240,232,.08);
+  border: 1px solid rgba(245,240,232,.2);
+  color: rgba(245,240,232,.7);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  padding: 5px 14px;
+  border-radius: 2px;
+  letter-spacing: 1px;
+}
+
+/* LAYOUT */
+.layout { display: flex; }
+
+nav {
+  width: 280px;
+  min-width: 280px;
+  background: var(--ink);
+  min-height: 100vh;
+  padding: 32px 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.nav-head {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(245,240,232,.3);
+  padding: 0 24px 16px;
+  border-bottom: 1px solid rgba(245,240,232,.08);
+  margin-bottom: 8px;
+}
+nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 24px;
+  color: rgba(245,240,232,.5);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 400;
+  transition: all .18s;
+  border-left: 2px solid transparent;
+}
+nav a:hover { color: var(--paper); border-left-color: var(--accent); }
+nav a .phase-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.nav-group {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(245,240,232,.25);
+  padding: 20px 24px 6px;
+}
+
+main {
+  flex: 1;
+  padding: 56px 64px;
+  max-width: 960px;
+  min-width: 0;
+}
+
+/* SECTIONS */
+section { margin-bottom: 80px; }
+
+.section-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+h2 {
+  font-family: 'Fraunces', serif;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 36px 0 12px;
+  color: var(--ink);
+}
+h4 {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin: 24px 0 10px;
+  color: var(--muted);
+}
+p { margin-bottom: 14px; color: #3a3525; }
+ul, ol { padding-left: 20px; margin-bottom: 14px; }
+li { margin-bottom: 5px; color: #3a3525; }
+strong { color: var(--ink); }
+
+/* CODE */
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: 4px;
+  padding: 24px 28px;
+  overflow-x: auto;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  margin: 16px 0 24px;
+  position: relative;
+  border-left: 3px solid var(--accent);
+}
+pre .fn { color: #7eb8c9; }
+pre .kw { color: #c792ea; }
+pre .st { color: #c3e88d; }
+pre .cm { color: #546e7a; font-style: italic; }
+pre .num { color: #f78c6c; }
+pre .cl { color: #ffcb6b; }
+
+.file-tag {
+  position: absolute;
+  top: 0; left: 0;
+  background: var(--accent);
+  color: #fff;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 3px 12px;
+  border-radius: 0 0 4px 0;
+}
+
+code { font-family: 'IBM Plex Mono', monospace; }
+p code, li code {
+  background: var(--paper2);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 2px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+/* PHASE CARDS */
+.phase-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 28px;
+  padding: 28px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 4px;
+}
+.phase-number {
+  font-family: 'Fraunces', serif;
+  font-size: 52px;
+  font-weight: 900;
+  line-height: 1;
+  opacity: .2;
+  flex-shrink: 0;
+}
+.phase-info h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  color: var(--paper);
+  margin: 0 0 6px;
+}
+.phase-info p { color: rgba(245,240,232,.6); font-size: 14px; margin: 0; }
+.phase-tag {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 2px;
+  margin-bottom: 8px;
+  display: inline-block;
+}
+
+/* CARDS */
+.card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* GRID */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+/* CALLOUT */
+.callout {
+  border-left: 3px solid var(--accent2);
+  background: rgba(46,134,171,.06);
+  padding: 14px 20px;
+  margin: 16px 0 24px;
+  border-radius: 0 4px 4px 0;
+}
+.callout.warn { border-left-color: var(--gold); background: rgba(232,168,56,.06); }
+.callout.tip  { border-left-color: var(--green); background: rgba(45,106,79,.06); }
+.callout strong { color: var(--ink); }
+
+/* TABLE */
+table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 13px; }
+th {
+  background: var(--paper2);
+  text-align: left;
+  padding: 10px 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 2px solid var(--border);
+}
+td { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--paper2); }
+
+/* LIFECYCLE DIAGRAM */
+.lifecycle {
+  display: flex;
+  overflow-x: auto;
+  gap: 0;
+  margin: 24px 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.lc-phase {
+  flex: 1;
+  min-width: 120px;
+  padding: 18px 16px;
+  text-align: center;
+  position: relative;
+}
+.lc-phase:not(:last-child)::after {
+  content: '→';
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 16px;
+  z-index: 1;
+}
+.lc-num {
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 900;
+  opacity: .25;
+  line-height: 1;
+}
+.lc-name {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+.lc-desc { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* TREE */
+.tree {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: 4px;
+  padding: 24px 28px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12.5px;
+  line-height: 2;
+  white-space: pre;
+  overflow-x: auto;
+  border-left: 3px solid var(--accent2);
+}
+.tree .d { color: #7eb8c9; }
+.tree .c { color: #546e7a; font-style: italic; }
+
+/* STEP LIST */
+.steps { list-style: none; padding: 0; }
+.steps li {
+  padding: 16px 20px 16px 64px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 10px;
+  position: relative;
+  background: white;
+  font-size: 14px;
+}
+.steps li::before {
+  content: attr(data-n);
+  position: absolute;
+  left: 18px; top: 50%;
+  transform: translateY(-50%);
+  width: 30px; height: 30px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 2px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 30px;
+  text-align: center;
+}
+.steps li strong { color: var(--accent); }
+
+/* COMPARISON */
+.versus {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0 24px;
+}
+.versus .old {
+  background: #fff0ee;
+  border: 1px solid #f5c5bc;
+  padding: 20px;
+  border-radius: 4px;
+}
+.versus .new {
+  background: #eef6f0;
+  border: 1px solid #b5d9c2;
+  padding: 20px;
+  border-radius: 4px;
+}
+.versus h4 { margin-top: 0; }
+.versus .old h4 { color: #c84b31; }
+.versus .new h4 { color: #2d6a4f; }
+
+/* TOC PILL */
+.toc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--paper2);
+  border: 1px solid var(--border);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  margin: 2px;
+  text-decoration: none;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--paper2); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+@media(max-width: 900px) {
+  nav { display: none; }
+  main { padding: 32px 20px; }
+  .grid-2, .grid-3, .versus { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-label">RAG Chatbot · Learning Edition · 2026</div>
+  <h1>Build a RAG Chatbot<br/><em>the right way</em></h1>
+  <p>A rebuilt, learning-first project. Every phase of the RAG lifecycle is visible, explained, and instrumented. No unnecessary Kafka. No duplicate databases. Just the patterns that actually matter.</p>
+  <div class="header-meta">
+    <span class="meta-chip">FastAPI + Python 3.11</span>
+    <span class="meta-chip">Qdrant (vector)</span>
+    <span class="meta-chip">LangGraph (workflow)</span>
+    <span class="meta-chip">Ollama / LLM-agnostic</span>
+    <span class="meta-chip">Docker Compose</span>
+    <span class="meta-chip">RAGAS evaluation</span>
+  </div>
+</header>
+
+<div class="layout">
+<nav>
+  <div class="nav-head">Contents</div>
+  <a href="#why"><span class="phase-dot" style="background:#7a7060"></span> Why We Rebuilt This</a>
+  <a href="#lifecycle"><span class="phase-dot" style="background:#c84b31"></span> RAG Lifecycle Overview</a>
+  <a href="#structure"><span class="phase-dot" style="background:#2e86ab"></span> Project Structure</a>
+  <a href="#infra"><span class="phase-dot" style="background:#7a7060"></span> Infrastructure Setup</a>
+
+  <div class="nav-group">RAG Phases</div>
+  <a href="#phase1"><span class="phase-dot" style="background:#c84b31"></span> Phase 1 — Ingestion</a>
+  <a href="#phase2"><span class="phase-dot" style="background:#e8a838"></span> Phase 2 — Embedding</a>
+  <a href="#phase3"><span class="phase-dot" style="background:#2e86ab"></span> Phase 3 — Retrieval</a>
+  <a href="#phase4"><span class="phase-dot" style="background:#2d6a4f"></span> Phase 4 — Generation</a>
+  <a href="#phase5"><span class="phase-dot" style="background:#7b5ea7"></span> Phase 5 — Evaluation</a>
+  <a href="#phase6"><span class="phase-dot" style="background:#d4522a"></span> Phase 6 — Observability</a>
+
+  <div class="nav-group">System</div>
+  <a href="#api"><span class="phase-dot" style="background:#7a7060"></span> API & Routing</a>
+  <a href="#ui"><span class="phase-dot" style="background:#7a7060"></span> UI (Chat + Admin)</a>
+  <a href="#agents"><span class="phase-dot" style="background:#7a7060"></span> Lightweight Agents</a>
+  <a href="#clone"><span class="phase-dot" style="background:#7a7060"></span> Clone & Run Guide</a>
+  <a href="#debug"><span class="phase-dot" style="background:#7a7060"></span> Debug Playbook</a>
+</nav>
+
+<main>
+
+<!-- ===== WHY ===== -->
+<section id="why">
+  <div class="section-label" style="color:var(--accent)">Preface</div>
+  <h2>Why We Rebuilt This Project</h2>
+
+  <p>The original project was an ambitious enterprise reference architecture — Kafka, Neo4j, Elasticsearch, ChromaDB, Redis, Kubernetes, all at once. That's valuable context for understanding what large systems look like. But it has a critical flaw as a <em>learning resource</em>: you spend most of your time fighting infrastructure, not learning RAG.</p>
+
+  <div class="versus">
+    <div class="old">
+      <h4>❌ Original Problems</h4>
+      <ul style="font-size:13px;">
+        <li>Kafka for a single-user chatbot (overkill by 1000x)</li>
+        <li>Two vector stores (ChromaDB <em>and</em> ES) doing the same job</li>
+        <li>Neo4j running with stub/fake entity extraction</li>
+        <li>RAGAS imported but never actually called</li>
+        <li>LLM hardcoded — can't swap models</li>
+        <li>No visibility into what RAG is doing internally</li>
+        <li>30% of the guide is Docker networking debug</li>
+      </ul>
+    </div>
+    <div class="new">
+      <h4>✅ This Version</h4>
+      <ul style="font-size:13px;">
+        <li>asyncio queue — same async pattern, zero ops overhead</li>
+        <li>One vector DB (Qdrant) — purpose-built, fast, simple</li>
+        <li>Real hybrid search: dense + sparse in one engine</li>
+        <li>RAGAS evaluation actually wired and running</li>
+        <li>LLM abstraction layer — swap Ollama ↔ OpenAI ↔ Anthropic</li>
+        <li><strong>Every phase is logged and visible in the UI</strong></li>
+        <li>Admin panel shows chunk sizes, retrieval scores, eval metrics</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <strong>Learning Philosophy:</strong> Add complexity only when you can observe its effect. In this project, every configuration knob you turn shows a measurable result — chunk size changes retrieval quality, temperature changes answer style, top_k changes what gets retrieved. You'll <em>see</em> the RAG lifecycle, not just deploy it.
+  </div>
+</section>
+
+<!-- ===== LIFECYCLE ===== -->
+<section id="lifecycle">
+  <div class="section-label" style="color:var(--accent)">Mental Model</div>
+  <h2>The RAG Lifecycle — 6 Phases</h2>
+  <p>Before touching a single file, internalize this. Every piece of code in this project maps to exactly one of these phases.</p>
+
+  <div class="lifecycle">
+    <div class="lc-phase" style="background:#fff0ee; border-right:1px solid var(--border)">
+      <div class="lc-num" style="color:var(--phase1)">1</div>
+      <div class="lc-name" style="color:var(--phase1)">Ingest</div>
+      <div class="lc-desc">Load &amp; clean documents</div>
+    </div>
+    <div class="lc-phase" style="background:#fffbf0; border-right:1px solid var(--border)">
+      <div class="lc-num" style="color:var(--phase2)">2</div>
+      <div class="lc-name" style="color:var(--phase2)">Embed</div>
+      <div class="lc-desc">Chunk → vectors</div>
+    </div>
+    <div class="lc-phase" style="background:#f0f7fb; border-right:1px solid var(--border)">
+      <div class="lc-num" style="color:var(--phase3)">3</div>
+      <div class="lc-name" style="color:var(--phase3)">Retrieve</div>
+      <div class="lc-desc">Find relevant chunks</div>
+    </div>
+    <div class="lc-phase" style="background:#f0f7f2; border-right:1px solid var(--border)">
+      <div class="lc-num" style="color:var(--phase4)">4</div>
+      <div class="lc-name" style="color:var(--phase4)">Generate</div>
+      <div class="lc-desc">LLM builds answer</div>
+    </div>
+    <div class="lc-phase" style="background:#f5f0fa; border-right:1px solid var(--border)">
+      <div class="lc-num" style="color:var(--phase5)">5</div>
+      <div class="lc-name" style="color:var(--phase5)">Evaluate</div>
+      <div class="lc-desc">Score with RAGAS</div>
+    </div>
+    <div class="lc-phase" style="background:#fff5f0">
+      <div class="lc-num" style="color:var(--phase6)">6</div>
+      <div class="lc-name" style="color:var(--phase6)">Observe</div>
+      <div class="lc-desc">Trace &amp; improve</div>
+    </div>
+  </div>
+
+  <p>The key insight is that RAG is a <strong>pipeline, not a model</strong>. The LLM is only involved in Phase 4. Phases 1–3 determine what information the LLM even sees, and Phases 5–6 tell you if it worked. Most failures come from bad Phase 1–3 decisions, not from the LLM being "bad."</p>
+
+  <table>
+    <tr><th>Phase</th><th>Key Question</th><th>Common Mistake</th><th>This Project Does</th></tr>
+    <tr><td style="color:var(--phase1)"><strong>Ingest</strong></td><td>Is the text clean?</td><td>Raw PDF with headers/footers noise</td><td>Normalizer strips boilerplate, logs char count</td></tr>
+    <tr><td style="color:var(--phase2)"><strong>Embed</strong></td><td>Are chunks the right size?</td><td>512-token fixed chunks cutting sentences</td><td>RecursiveTextSplitter + overlap, stored with metadata</td></tr>
+    <tr><td style="color:var(--phase3)"><strong>Retrieve</strong></td><td>Are the right chunks returned?</td><td>Pure vector search misses exact terms</td><td>Hybrid dense+sparse, scores shown in UI</td></tr>
+    <tr><td style="color:var(--phase4)"><strong>Generate</strong></td><td>Does the prompt use context well?</td><td>Dumping all chunks without structure</td><td>Structured prompt template, source citations</td></tr>
+    <tr><td style="color:var(--phase5)"><strong>Evaluate</strong></td><td>Is the answer faithful?</td><td>Subjective "looks good" review</td><td>RAGAS faithfulness + relevancy scores stored</td></tr>
+    <tr><td style="color:var(--phase6)"><strong>Observe</strong></td><td>What's slow/wrong?</td><td>No logs, no metrics</td><td>Structured JSON logs, latency per phase, admin dashboard</td></tr>
+  </table>
+</section>
+
+<!-- ===== STRUCTURE ===== -->
+<section id="structure">
+  <div class="section-label" style="color:var(--accent2)">Architecture</div>
+  <h2>Project Structure</h2>
+
+  <div class="tree"><span class="d">/opt/rag-learn/</span>
+<span class="c">├── docker-compose.yml        # Only 3 services: API, Qdrant, Redis</span>
+<span class="c">├── .env                      # Environment config</span>
+<span class="c">├── Dockerfile</span>
+<span class="c">├── requirements.txt</span>
+│
+<span class="d">├── app/</span>
+<span class="c">│   ├── main.py               # FastAPI app + all routes</span>
+<span class="c">│   ├── config.py             # Settings (pydantic-settings)</span>
+│   │
+<span class="d">│   ├── pipeline/</span>             <span class="c"># One folder = one RAG phase</span>
+<span class="c">│   │   ├── ingestion.py      # Phase 1: Load, parse, clean</span>
+<span class="c">│   │   ├── embedder.py       # Phase 2: Chunk + embed</span>
+<span class="c">│   │   ├── retriever.py      # Phase 3: Hybrid search + rerank</span>
+<span class="c">│   │   ├── generator.py      # Phase 4: Prompt + LLM call</span>
+<span class="c">│   │   ├── evaluator.py      # Phase 5: RAGAS scoring</span>
+<span class="c">│   │   └── observer.py       # Phase 6: Trace & metrics</span>
+│   │
+<span class="d">│   ├── llm/</span>
+<span class="c">│   │   ├── base.py           # Abstract LLM interface</span>
+<span class="c">│   │   ├── ollama.py         # Ollama adapter</span>
+<span class="c">│   │   └── openai.py         # OpenAI adapter (drop-in swap)</span>
+│   │
+<span class="d">│   ├── agents/</span>
+<span class="c">│   │   └── rag_agent.py      # LangGraph workflow (4 nodes)</span>
+│   │
+<span class="c">│   ├── db.py                 # SQLite: chat history + eval logs</span>
+<span class="c">│   └── cache.py              # Redis: response cache</span>
+│
+<span class="d">├── ui/</span>
+<span class="c">│   ├── index.html            # Chat UI — shows retrieval trace</span>
+<span class="c">│   └── admin.html            # Admin: config + metrics dashboard</span>
+│
+<span class="d">└── data/</span>
+<span class="c">    ├── uploads/              # User-uploaded documents</span>
+<span class="c">    └── rag_learn.db          # SQLite database</span></div>
+
+  <div class="callout">
+    <strong>Design rule:</strong> The <code>pipeline/</code> folder is the heart of the project. Each file is self-contained — you can read <code>retriever.py</code> alone and understand Phase 3 completely. This is intentional for learning.
+  </div>
+</section>
+
+<!-- ===== INFRA ===== -->
+<section id="infra">
+  <div class="section-label" style="color:var(--muted)">Infrastructure</div>
+  <h2>Infrastructure — Minimal & Honest</h2>
+  <p>Three services. That's it. No Kafka, no Neo4j, no Elasticsearch. We add what we need and nothing more.</p>
+
+  <h3>docker-compose.yml</h3>
+<pre><span class="file-tag">docker-compose.yml</span>
+version: "3.9"
+services:
+
+  api:
+    build: .
+    container_name: rag-learn-api
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - ./data:/app/data          <span class="cm"># persist SQLite + uploads</span>
+    depends_on:
+      - qdrant
+      - redis
+
+  qdrant:                          <span class="cm"># purpose-built vector DB</span>
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"               <span class="cm"># REST API + web dashboard</span>
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  redis:                           <span class="cm"># response cache only</span>
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  qdrant_data:</pre>
+
+  <h3>.env</h3>
+<pre><span class="file-tag">.env</span>
+<span class="cm"># LLM — choose one, comment the other</span>
+LLM_PROVIDER=ollama               <span class="cm"># or: openai</span>
+OLLAMA_HOST=http://host.docker.internal:11434
+OLLAMA_MODEL=llama3
+
+OPENAI_API_KEY=sk-...             <span class="cm"># only needed if LLM_PROVIDER=openai</span>
+OPENAI_MODEL=gpt-4o-mini
+
+<span class="cm"># Services (Docker service names, NOT localhost)</span>
+QDRANT_HOST=http://qdrant:6333
+REDIS_HOST=redis
+
+<span class="cm"># RAG parameters (can be changed from Admin UI)</span>
+CHUNK_SIZE=512
+CHUNK_OVERLAP=64
+TOP_K=10
+TOP_N=3
+HYBRID_ALPHA=0.5                  <span class="cm"># 0=BM25 only, 1=vector only, 0.5=balanced</span></pre>
+
+  <h3>Dockerfile</h3>
+<pre><span class="file-tag">Dockerfile</span>
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]</pre>
+
+  <h3>requirements.txt</h3>
+<pre><span class="file-tag">requirements.txt</span>
+fastapi
+uvicorn[standard]
+pydantic-settings
+python-dotenv
+httpx
+
+<span class="cm"># RAG pipeline</span>
+langchain
+langgraph
+qdrant-client
+sentence-transformers       <span class="cm"># embedding: BAAI/bge-m3</span>
+rank-bm25                   <span class="cm"># BM25 sparse retrieval</span>
+
+<span class="cm"># Document parsing</span>
+unstructured[pdf,docx]
+pymupdf
+
+<span class="cm"># LLM clients</span>
+openai                      <span class="cm"># also works for local Ollama-compatible APIs</span>
+
+<span class="cm"># Evaluation</span>
+ragas
+
+<span class="cm"># Cache & DB</span>
+redis
+aiofiles</pre>
+</section>
+
+<!-- ===== PHASE 1 ===== -->
+<section id="phase1">
+  <div class="phase-header">
+    <div class="phase-number">01</div>
+    <div class="phase-info">
+      <span class="phase-tag" style="background:rgba(200,75,49,.2); color:#ffb8a8">Phase 1</span>
+      <h3>Ingestion — Loading &amp; Cleaning Documents</h3>
+      <p>The quality of your RAG system is bounded by the quality of your ingestion. Garbage in, garbage out. This phase teaches you to parse, normalize, and store raw documents before any AI touches them.</p>
+    </div>
+  </div>
+
+  <p><strong>What you learn:</strong> How different file formats are parsed, why text cleaning matters, what metadata to preserve, and how to track ingestion status.</p>
+
+<pre><span class="file-tag">app/pipeline/ingestion.py</span>
+<span class="cm"># =============================================================
+# PHASE 1: INGESTION
+# Goal: Load a document → clean text → return structured chunks
+# Input:  raw file (PDF / DOCX / TXT / MD)
+# Output: list of { text, metadata } dicts
+# =============================================================</span>
+
+import re
+import fitz           <span class="cm"># PyMuPDF — best PDF parser</span>
+import docx
+from pathlib import Path
+from typing import List, Dict
+from app.pipeline.observer import log_phase   <span class="cm"># Phase 6 logging</span>
+
+<span class="kw">class</span> <span class="cl">DocumentIngester</span>:
+
+    <span class="kw">def</span> <span class="fn">load</span>(self, file_path: <span class="cl">str</span>) -> <span class="cl">List</span>[<span class="cl">Dict</span>]:
+        <span class="cm">"""Entry point: detect format and dispatch to correct parser."""</span>
+        path = Path(file_path)
+        suffix = path.suffix.lower()
+
+        <span class="kw">with</span> log_phase(<span class="st">"ingestion"</span>, file=path.name):
+            <span class="kw">if</span> suffix == <span class="st">".pdf"</span>:
+                raw_pages = self._parse_pdf(file_path)
+            <span class="kw">elif</span> suffix == <span class="st">".docx"</span>:
+                raw_pages = self._parse_docx(file_path)
+            <span class="kw">elif</span> suffix <span class="kw">in</span> (<span class="st">".txt"</span>, <span class="st">".md"</span>):
+                raw_pages = self._parse_text(file_path)
+            <span class="kw">else</span>:
+                <span class="kw">raise</span> <span class="cl">ValueError</span>(f<span class="st">"Unsupported file type: {suffix}"</span>)
+
+            <span class="cm"># Clean each page and record what changed</span>
+            cleaned = [self._clean(page) <span class="kw">for</span> page <span class="kw">in</span> raw_pages]
+            <span class="kw">return</span> cleaned
+
+    <span class="kw">def</span> <span class="fn">_parse_pdf</span>(self, path) -> <span class="cl">List</span>[<span class="cl">Dict</span>]:
+        pages = []
+        doc = fitz.open(path)
+        <span class="kw">for</span> i, page <span class="kw">in</span> enumerate(doc):
+            text = page.get_text(<span class="st">"text"</span>)
+            pages.append({
+                <span class="st">"text"</span>: text,
+                <span class="st">"metadata"</span>: {
+                    <span class="st">"source"</span>: Path(path).name,
+                    <span class="st">"page"</span>: i + <span class="num">1</span>,
+                    <span class="st">"total_pages"</span>: len(doc)
+                }
+            })
+        <span class="kw">return</span> pages
+
+    <span class="kw">def</span> <span class="fn">_parse_docx</span>(self, path) -> <span class="cl">List</span>[<span class="cl">Dict</span>]:
+        doc = docx.Document(path)
+        <span class="cm"># Treat each paragraph as a "page" for consistency</span>
+        paras = [p.text <span class="kw">for</span> p <span class="kw">in</span> doc.paragraphs <span class="kw">if</span> p.text.strip()]
+        full_text = <span class="st">"\n\n"</span>.join(paras)
+        <span class="kw">return</span> [{<span class="st">"text"</span>: full_text, <span class="st">"metadata"</span>: {<span class="st">"source"</span>: Path(path).name, <span class="st">"page"</span>: <span class="num">1</span>}}]
+
+    <span class="kw">def</span> <span class="fn">_parse_text</span>(self, path) -> <span class="cl">List</span>[<span class="cl">Dict</span>]:
+        text = Path(path).read_text(encoding=<span class="st">"utf-8"</span>)
+        <span class="kw">return</span> [{<span class="st">"text"</span>: text, <span class="st">"metadata"</span>: {<span class="st">"source"</span>: Path(path).name, <span class="st">"page"</span>: <span class="num">1</span>}}]
+
+    <span class="kw">def</span> <span class="fn">_clean</span>(self, page: <span class="cl">Dict</span>) -> <span class="cl">Dict</span>:
+        <span class="cm">"""
+        Text normalization — THIS IS WHERE MOST BUGS HIDE.
+        Log before/after so you can see what's being removed.
+        """</span>
+        original = page[<span class="st">"text"</span>]
+
+        text = re.sub(r<span class="st">'\n{3,}'</span>, <span class="st">'\n\n'</span>, original)   <span class="cm"># collapse blank lines</span>
+        text = re.sub(r<span class="st">' {2,}'</span>, <span class="st">' '</span>, text)              <span class="cm"># collapse spaces</span>
+        text = re.sub(r<span class="st">'[^\x00-\x7F\uAC00-\uD7A3]'</span>, <span class="st">''</span>, text)  <span class="cm"># keep ASCII + Korean</span>
+        text = text.strip()
+
+        page[<span class="st">"text"</span>] = text
+        page[<span class="st">"metadata"</span>][<span class="st">"raw_chars"</span>] = len(original)    <span class="cm"># visible in admin UI</span>
+        page[<span class="st">"metadata"</span>][<span class="st">"clean_chars"</span>] = len(text)
+        <span class="kw">return</span> page</pre>
+
+  <div class="callout tip">
+    <strong>Learning exercise:</strong> After ingesting a PDF, check the admin panel to see <code>raw_chars</code> vs <code>clean_chars</code>. If the ratio is very different (e.g., 50% reduction), your PDF has a lot of noise — headers, footers, tables. That noise would have gone into your embeddings and hurt retrieval quality.
+  </div>
+</section>
+
+<!-- ===== PHASE 2 ===== -->
+<section id="phase2">
+  <div class="phase-header">
+    <div class="phase-number">02</div>
+    <div class="phase-info">
+      <span class="phase-tag" style="background:rgba(232,168,56,.2); color:#c8860a">Phase 2</span>
+      <h3>Embedding — Chunking &amp; Vectorization</h3>
+      <p>Turn cleaned text into searchable vector representations. The chunking strategy here is the single biggest factor in retrieval quality — more than the model you use.</p>
+    </div>
+  </div>
+
+<pre><span class="file-tag">app/pipeline/embedder.py</span>
+<span class="cm"># =============================================================
+# PHASE 2: EMBEDDING
+# Goal: Split pages into chunks → embed → store in Qdrant
+# Key decisions: chunk_size, chunk_overlap, embedding model
+# =============================================================</span>
+
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from sentence_transformers import SentenceTransformer
+from qdrant_client import QdrantClient
+from qdrant_client.models import VectorParams, Distance, PointStruct
+from app.config import settings
+from app.pipeline.observer import log_phase
+import uuid
+
+EMBEDDING_MODEL = <span class="st">"BAAI/bge-m3"</span>    <span class="cm"># 768-dim, multilingual, top-tier</span>
+COLLECTION_NAME = <span class="st">"rag_docs"</span>
+
+model = SentenceTransformer(EMBEDDING_MODEL)
+
+<span class="kw">class</span> <span class="cl">Embedder</span>:
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        self.client = QdrantClient(url=settings.QDRANT_HOST)
+        self._ensure_collection()
+
+    <span class="kw">def</span> <span class="fn">_ensure_collection</span>(self):
+        <span class="cm">"""Create Qdrant collection if it doesn't exist yet."""</span>
+        existing = [c.name <span class="kw">for</span> c <span class="kw">in</span> self.client.get_collections().collections]
+        <span class="kw">if</span> COLLECTION_NAME <span class="kw">not in</span> existing:
+            self.client.create_collection(
+                collection_name=COLLECTION_NAME,
+                vectors_config=VectorParams(
+                    size=<span class="num">768</span>,               <span class="cm"># BAAI/bge-m3 dimension</span>
+                    distance=Distance.COSINE
+                )
+            )
+
+    <span class="kw">def</span> <span class="fn">embed_and_store</span>(self, pages, chunk_size=<span class="kw">None</span>, chunk_overlap=<span class="kw">None</span>):
+        <span class="cm">"""
+        Main method called after ingestion.
+        chunk_size / chunk_overlap come from config (or Admin UI override).
+        """</span>
+        cs = chunk_size <span class="kw">or</span> settings.CHUNK_SIZE
+        co = chunk_overlap <span class="kw">or</span> settings.CHUNK_OVERLAP
+
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=cs,
+            chunk_overlap=co,
+            <span class="cm"># Separators tried in order — tries paragraph first, then sentence, etc.</span>
+            separators=[<span class="st">"\n\n"</span>, <span class="st">"\n"</span>, <span class="st">". "</span>, <span class="st">" "</span>, <span class="st">""</span>]
+        )
+
+        all_points = []
+        stats = {<span class="st">"chunks"</span>: <span class="num">0</span>, <span class="st">"avg_chunk_len"</span>: <span class="num">0</span>}
+
+        <span class="kw">with</span> log_phase(<span class="st">"embedding"</span>, chunk_size=cs, overlap=co):
+            <span class="kw">for</span> page <span class="kw">in</span> pages:
+                chunks = splitter.split_text(page[<span class="st">"text"</span>])
+
+                <span class="kw">for</span> chunk <span class="kw">in</span> chunks:
+                    vector = model.encode(chunk).tolist()
+                    point_id = str(uuid.uuid4())
+
+                    all_points.append(PointStruct(
+                        id=point_id,
+                        vector=vector,
+                        payload={
+                            <span class="st">"text"</span>: chunk,
+                            <span class="st">"chunk_len"</span>: len(chunk),         <span class="cm"># visible in UI</span>
+                            **page[<span class="st">"metadata"</span>]
+                        }
+                    ))
+
+            <span class="cm"># Batch upsert — faster than one-by-one</span>
+            self.client.upsert(collection_name=COLLECTION_NAME, points=all_points)
+
+            stats[<span class="st">"chunks"</span>] = len(all_points)
+            stats[<span class="st">"avg_chunk_len"</span>] = int(sum(p.payload[<span class="st">"chunk_len"</span>] <span class="kw">for</span> p <span class="kw">in</span> all_points) / max(len(all_points), <span class="num">1</span>))
+
+        <span class="kw">return</span> stats   <span class="cm"># returned to API → shown in UI</span></pre>
+
+  <div class="callout warn">
+    <strong>The chunking experiment to run:</strong> Try the same document with <code>chunk_size=128</code> vs <code>chunk_size=1024</code>. Ask the same question. Watch what the retriever returns in the UI. Smaller chunks = more precise but may cut context. Larger chunks = more context but noisier similarity scores.
+  </div>
+</section>
+
+<!-- ===== PHASE 3 ===== -->
+<section id="phase3">
+  <div class="phase-header">
+    <div class="phase-number">03</div>
+    <div class="phase-info">
+      <span class="phase-tag" style="background:rgba(46,134,171,.2); color:#1a6080">Phase 3</span>
+      <h3>Retrieval — Hybrid Search &amp; Reranking</h3>
+      <p>Given a query, find the most relevant chunks. This is a two-stage process: cast a wide net (top_k=10), then rerank to keep only the best (top_n=3).</p>
+    </div>
+  </div>
+
+<pre><span class="file-tag">app/pipeline/retriever.py</span>
+<span class="cm"># =============================================================
+# PHASE 3: RETRIEVAL
+# Two stages:
+#   1) Hybrid search — dense vector + sparse BM25, fused with RRF
+#   2) Reranking    — CrossEncoder scores the top candidates
+# Returns chunks with scores visible to the UI
+# =============================================================</span>
+
+from qdrant_client import QdrantClient
+from sentence_transformers import SentenceTransformer, CrossEncoder
+from rank_bm25 import BM25Okapi
+from app.config import settings
+from app.pipeline.observer import log_phase
+from typing import List, Dict
+import numpy as np
+
+EMBEDDING_MODEL = <span class="st">"BAAI/bge-m3"</span>
+RERANKER_MODEL  = <span class="st">"cross-encoder/ms-marco-MiniLM-L-6-v2"</span>
+COLLECTION_NAME = <span class="st">"rag_docs"</span>
+
+embedder = SentenceTransformer(EMBEDDING_MODEL)
+reranker  = CrossEncoder(RERANKER_MODEL)
+
+<span class="kw">class</span> <span class="cl">Retriever</span>:
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        self.client = QdrantClient(url=settings.QDRANT_HOST)
+
+    <span class="kw">def</span> <span class="fn">retrieve</span>(self, query: <span class="cl">str</span>, top_k=<span class="kw">None</span>, top_n=<span class="kw">None</span>, alpha=<span class="kw">None</span>) -> <span class="cl">List</span>[<span class="cl">Dict</span>]:
+        <span class="cm">"""
+        alpha: 0.0 = pure BM25, 1.0 = pure vector, 0.5 = balanced
+        Returns list of dicts with text, metadata, AND scores (for UI display)
+        """</span>
+        k = top_k <span class="kw">or</span> settings.TOP_K
+        n = top_n <span class="kw">or</span> settings.TOP_N
+        a = alpha <span class="kw">if</span> alpha <span class="kw">is not None else</span> settings.HYBRID_ALPHA
+
+        <span class="kw">with</span> log_phase(<span class="st">"retrieval"</span>, query=query, top_k=k, alpha=a):
+            <span class="cm"># --- Stage 1a: Dense vector search ---</span>
+            query_vec = embedder.encode(query).tolist()
+            dense_hits = self.client.search(
+                collection_name=COLLECTION_NAME,
+                query_vector=query_vec,
+                limit=k,
+                with_payload=<span class="kw">True</span>
+            )
+
+            <span class="cm"># --- Stage 1b: Sparse BM25 search ---</span>
+            <span class="cm"># Retrieve all docs for BM25 (in production, you'd use Qdrant sparse vectors)</span>
+            all_docs = self.client.scroll(collection_name=COLLECTION_NAME, limit=<span class="num">1000</span>, with_payload=<span class="kw">True</span>)[<span class="num">0</span>]
+            corpus = [p.payload[<span class="st">"text"</span>] <span class="kw">for</span> p <span class="kw">in</span> all_docs]
+            bm25 = BM25Okapi([doc.split() <span class="kw">for</span> doc <span class="kw">in</span> corpus])
+            bm25_scores = bm25.get_scores(query.split())
+
+            <span class="cm"># --- Reciprocal Rank Fusion (RRF) ---</span>
+            <span class="cm"># Combines dense and sparse rankings without needing to normalize scores</span>
+            RRF_K = <span class="num">60</span>
+            fused: Dict[str, float] = {}
+
+            <span class="kw">for</span> rank, hit <span class="kw">in</span> enumerate(dense_hits):
+                pid = str(hit.id)
+                fused[pid] = fused.get(pid, <span class="num">0</span>) + a / (RRF_K + rank + <span class="num">1</span>)
+
+            bm25_ranked = np.argsort(bm25_scores)[::-<span class="num">1</span>][:k]
+            <span class="kw">for</span> rank, idx <span class="kw">in</span> enumerate(bm25_ranked):
+                pid = str(all_docs[idx].id)
+                fused[pid] = fused.get(pid, <span class="num">0</span>) + (<span class="num">1</span>-a) / (RRF_K + rank + <span class="num">1</span>)
+
+            <span class="cm"># Get top-k by fused score</span>
+            top_pids = sorted(fused, key=fused.get, reverse=<span class="kw">True</span>)[:k]
+            candidates = {str(p.id): p <span class="kw">for</span> p <span class="kw">in</span> all_docs}
+            top_docs = [candidates[pid] <span class="kw">for</span> pid <span class="kw">in</span> top_pids <span class="kw">if</span> pid <span class="kw">in</span> candidates]
+
+            <span class="cm"># --- Stage 2: Rerank with CrossEncoder ---</span>
+            pairs = [[query, doc.payload[<span class="st">"text"</span>]] <span class="kw">for</span> doc <span class="kw">in</span> top_docs]
+            rerank_scores = reranker.predict(pairs)
+            ranked = sorted(zip(top_docs, rerank_scores), key=<span class="kw">lambda</span> x: x[<span class="num">1</span>], reverse=<span class="kw">True</span>)
+
+            <span class="cm"># Return top-n with ALL scores for UI transparency</span>
+            results = []
+            <span class="kw">for</span> doc, score <span class="kw">in</span> ranked[:n]:
+                results.append({
+                    <span class="st">"text"</span>: doc.payload[<span class="st">"text"</span>],
+                    <span class="st">"source"</span>: doc.payload.get(<span class="st">"source"</span>, <span class="st">"unknown"</span>),
+                    <span class="st">"page"</span>: doc.payload.get(<span class="st">"page"</span>, <span class="num">0</span>),
+                    <span class="st">"rerank_score"</span>: round(float(score), <span class="num">4</span>),   <span class="cm"># shown in UI!</span>
+                    <span class="st">"rrf_score"</span>: round(fused.get(str(doc.id), <span class="num">0</span>), <span class="num">4</span>)
+                })
+            <span class="kw">return</span> results</pre>
+
+  <div class="callout">
+    <strong>What RRF does:</strong> Reciprocal Rank Fusion combines rankings from two different systems (dense vector + BM25) without needing their scores to be on the same scale. A document ranked #1 by both systems scores higher than one ranked #1 by only one. This is why hybrid retrieval consistently outperforms either alone.
+  </div>
+</section>
+
+<!-- ===== PHASE 4 ===== -->
+<section id="phase4">
+  <div class="phase-header">
+    <div class="phase-number">04</div>
+    <div class="phase-info">
+      <span class="phase-tag" style="background:rgba(45,106,79,.2); color:#1a4a30">Phase 4</span>
+      <h3>Generation — Prompt Engineering &amp; LLM Abstraction</h3>
+      <p>Build the final answer from retrieved context. The LLM is the last step, not the first — and the prompt structure matters as much as the model.</p>
+    </div>
+  </div>
+
+<pre><span class="file-tag">app/llm/base.py</span>
+<span class="cm"># Abstraction layer — lets you swap LLMs without changing any pipeline code</span>
+<span class="kw">from</span> abc <span class="kw">import</span> ABC, abstractmethod
+
+<span class="kw">class</span> <span class="cl">BaseLLM</span>(ABC):
+    @abstractmethod
+    <span class="kw">def</span> <span class="fn">generate</span>(self, prompt: <span class="cl">str</span>) -> <span class="cl">str</span>: ...
+
+    @abstractmethod
+    <span class="kw">def</span> <span class="fn">generate_stream</span>(self, prompt: <span class="cl">str</span>): ...  <span class="cm"># generator for SSE streaming</span>
+
+<span class="kw">def</span> <span class="fn">get_llm</span>() -> <span class="cl">BaseLLM</span>:
+    <span class="cm">"""Factory — reads LLM_PROVIDER from env."""</span>
+    <span class="kw">from</span> app.config <span class="kw">import</span> settings
+    <span class="kw">if</span> settings.LLM_PROVIDER == <span class="st">"openai"</span>:
+        <span class="kw">from</span> app.llm.openai <span class="kw">import</span> OpenAILLM
+        <span class="kw">return</span> OpenAILLM()
+    <span class="kw">else</span>:
+        <span class="kw">from</span> app.llm.ollama <span class="kw">import</span> OllamaLLM
+        <span class="kw">return</span> OllamaLLM()</pre>
+
+<pre><span class="file-tag">app/llm/ollama.py</span>
+<span class="kw">import</span> httpx
+<span class="kw">from</span> app.config <span class="kw">import</span> settings
+<span class="kw">from</span> app.llm.base <span class="kw">import</span> BaseLLM
+<span class="kw">import</span> json
+
+<span class="kw">class</span> <span class="cl">OllamaLLM</span>(BaseLLM):
+
+    <span class="kw">def</span> <span class="fn">generate</span>(self, prompt):
+        r = httpx.post(
+            f<span class="st">"{settings.OLLAMA_HOST}/api/generate"</span>,
+            json={<span class="st">"model"</span>: settings.OLLAMA_MODEL, <span class="st">"prompt"</span>: prompt, <span class="st">"stream"</span>: <span class="kw">False</span>},
+            timeout=<span class="num">120</span>
+        )
+        <span class="kw">return</span> r.json()[<span class="st">"response"</span>]
+
+    <span class="kw">def</span> <span class="fn">generate_stream</span>(self, prompt):
+        <span class="cm"># yields token by token for SSE streaming</span>
+        <span class="kw">with</span> httpx.stream(<span class="st">"POST"</span>, f<span class="st">"{settings.OLLAMA_HOST}/api/generate"</span>,
+                          json={<span class="st">"model"</span>: settings.OLLAMA_MODEL, <span class="st">"prompt"</span>: prompt, <span class="st">"stream"</span>: <span class="kw">True</span>},
+                          timeout=<span class="num">120</span>) <span class="kw">as</span> r:
+            <span class="kw">for</span> line <span class="kw">in</span> r.iter_lines():
+                data = json.loads(line)
+                <span class="kw">if</span> token := data.get(<span class="st">"response"</span>):
+                    <span class="kw">yield</span> token</pre>
+
+<pre><span class="file-tag">app/pipeline/generator.py</span>
+<span class="cm"># =============================================================
+# PHASE 4: GENERATION
+# The prompt template is the most impactful thing you can tune.
+# This template:
+#   - Grounds the LLM in the retrieved context
+#   - Forces citation of sources
+#   - Prevents hallucination with explicit instruction
+# =============================================================</span>
+
+<span class="kw">from</span> app.llm.base <span class="kw">import</span> get_llm
+<span class="kw">from</span> app.pipeline.observer <span class="kw">import</span> log_phase
+<span class="kw">from</span> typing <span class="kw">import</span> List, Dict
+
+PROMPT_TEMPLATE = <span class="st">"""You are a helpful assistant. Answer the question using ONLY
+the context below. If the context does not contain the answer, say
+"I don't have enough information to answer this."
+
+Do not make up information. Cite the source document when possible.
+
+=== Context ===
+{context}
+
+=== Question ===
+{question}
+
+=== Answer ==="""</span>
+
+<span class="kw">class</span> <span class="cl">Generator</span>:
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        self.llm = get_llm()
+
+    <span class="kw">def</span> <span class="fn">generate</span>(self, question: <span class="cl">str</span>, retrieved_chunks: <span class="cl">List</span>[<span class="cl">Dict</span>]) -> <span class="cl">Dict</span>:
+        <span class="cm"># Format context: numbered list with source attribution</span>
+        context_parts = []
+        <span class="kw">for</span> i, chunk <span class="kw">in</span> enumerate(retrieved_chunks, <span class="num">1</span>):
+            source_label = f<span class="st">"[{i}] {chunk['source']} p.{chunk['page']}"</span>
+            context_parts.append(f<span class="st">"{source_label}\n{chunk['text']}"</span>)
+        context = <span class="st">"\n\n"</span>.join(context_parts)
+
+        prompt = PROMPT_TEMPLATE.format(context=context, question=question)
+
+        <span class="kw">with</span> log_phase(<span class="st">"generation"</span>, prompt_len=len(prompt)):
+            answer = self.llm.generate(prompt)
+
+        <span class="kw">return</span> {
+            <span class="st">"answer"</span>: answer,
+            <span class="st">"prompt"</span>: prompt,       <span class="cm"># visible in admin UI → debug prompt</span>
+            <span class="st">"sources"</span>: [
+                {<span class="st">"text"</span>: c[<span class="st">"text"</span>][:200], <span class="st">"source"</span>: c[<span class="st">"source"</span>], <span class="st">"page"</span>: c[<span class="st">"page"</span>],
+                 <span class="st">"score"</span>: c[<span class="st">"rerank_score"</span>]}
+                <span class="kw">for</span> c <span class="kw">in</span> retrieved_chunks
+            ]
+        }</pre>
+</section>
+
+<!-- ===== PHASE 5 ===== -->
+<section id="phase5">
+  <div class="phase-header">
+    <div class="phase-number">05</div>
+    <div class="phase-info">
+      <span class="phase-tag" style="background:rgba(123,94,167,.2); color:#5a3a8a">Phase 5</span>
+      <h3>Evaluation — RAGAS Scoring (Actually Wired)</h3>
+      <p>Don't just guess if your RAG works. RAGAS gives you three quantitative scores per query. Watching these scores change as you tune chunk size and retrieval parameters is the core learning loop.</p>
+    </div>
+  </div>
+
+  <h3>The three scores you need to understand</h3>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title" style="color:var(--phase5)">Faithfulness</div>
+      <p style="font-size:13px;">Is every claim in the answer supported by the retrieved context? <strong>Low score = hallucination.</strong> Range: 0–1.</p>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--phase5)">Answer Relevancy</div>
+      <p style="font-size:13px;">Does the answer address the question asked? Low score means the LLM went off-topic. Range: 0–1.</p>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--phase5)">Context Precision</div>
+      <p style="font-size:13px;">Were the retrieved chunks actually relevant? Low score means retrieval is returning noise. Range: 0–1.</p>
+    </div>
+  </div>
+
+<pre><span class="file-tag">app/pipeline/evaluator.py</span>
+<span class="cm"># =============================================================
+# PHASE 5: EVALUATION
+# RAGAS scores are computed after every query and stored in DB.
+# The admin dashboard plots these over time so you can see
+# how your parameter changes affected quality.
+# =============================================================</span>
+
+<span class="kw">from</span> ragas <span class="kw">import</span> evaluate
+<span class="kw">from</span> ragas.metrics <span class="kw">import</span> faithfulness, answer_relevancy, context_precision
+<span class="kw">from</span> datasets <span class="kw">import</span> Dataset
+<span class="kw">from</span> app.db <span class="kw">import</span> save_eval_result
+<span class="kw">from</span> app.pipeline.observer <span class="kw">import</span> log_phase
+<span class="kw">import</span> asyncio
+
+<span class="kw">class</span> <span class="cl">Evaluator</span>:
+
+    <span class="kw">def</span> <span class="fn">score</span>(self, question: <span class="cl">str</span>, answer: <span class="cl">str</span>, contexts: <span class="cl">list</span>) -> <span class="cl">dict</span>:
+        <span class="cm">"""
+        Run after every query. Stores scores in DB.
+        Note: RAGAS uses an LLM internally — it may be slow.
+        Set EVAL_ENABLED=false in .env to disable for dev.
+        """</span>
+        dataset = Dataset.from_dict({
+            <span class="st">"question"</span>: [question],
+            <span class="st">"answer"</span>: [answer],
+            <span class="st">"contexts"</span>: [[c[<span class="st">"text"</span>] <span class="kw">for</span> c <span class="kw">in</span> contexts]]
+        })
+
+        <span class="kw">with</span> log_phase(<span class="st">"evaluation"</span>):
+            result = evaluate(
+                dataset,
+                metrics=[faithfulness, answer_relevancy, context_precision]
+            )
+
+        scores = {
+            <span class="st">"faithfulness"</span>:      round(result[<span class="st">"faithfulness"</span>], <span class="num">3</span>),
+            <span class="st">"answer_relevancy"</span>:   round(result[<span class="st">"answer_relevancy"</span>], <span class="num">3</span>),
+            <span class="st">"context_precision"</span>:  round(result[<span class="st">"context_precision"</span>], <span class="num">3</span>),
+        }
+
+        <span class="cm"># Persist — plotted in admin dashboard over time</span>
+        save_eval_result(question=question, answer=answer, scores=scores)
+        <span class="kw">return</span> scores</pre>
+</section>
+
+<!-- ===== PHASE 6 ===== -->
+<section id="phase6">
+  <div class="phase-header">
+    <div class="phase-number">06</div>
+    <div class="phase-info">
+      <span class="phase-tag" style="background:rgba(212,82,42,.2); color:#a03010">Phase 6</span>
+      <h3>Observability — Trace Every Request</h3>
+      <p>If you can't see what's happening inside each query, you can't improve it. This phase instruments every other phase with latency tracking and structured logging.</p>
+    </div>
+  </div>
+
+<pre><span class="file-tag">app/pipeline/observer.py</span>
+<span class="cm"># =============================================================
+# PHASE 6: OBSERVABILITY
+# A context manager that wraps each pipeline phase.
+# Automatically logs: phase name, duration, key params, errors.
+# Output goes to: console + in-memory trace store (shown in UI)
+# =============================================================</span>
+
+<span class="kw">import</span> time, json, logging
+<span class="kw">from</span> contextlib <span class="kw">import</span> contextmanager
+<span class="kw">from</span> typing <span class="kw">import</span> List, Dict
+
+logging.basicConfig(level=logging.INFO, format=<span class="st">"%(asctime)s %(message)s"</span>)
+logger = logging.getLogger(<span class="st">"rag.trace"</span>)
+
+<span class="cm"># In-memory trace store — last 100 requests visible in admin UI</span>
+TRACE_STORE: List[Dict] = []
+
+@contextmanager
+<span class="kw">def</span> <span class="fn">log_phase</span>(phase_name: <span class="cl">str</span>, **kwargs):
+    <span class="cm">"""
+    Usage:
+        with log_phase("retrieval", query=q, top_k=10):
+            results = retriever.retrieve(q)
+    """</span>
+    start = time.perf_counter()
+    entry = {<span class="st">"phase"</span>: phase_name, <span class="st">"params"</span>: kwargs, <span class="st">"status"</span>: <span class="st">"running"</span>}
+    <span class="kw">try</span>:
+        <span class="kw">yield</span> entry
+        entry[<span class="st">"status"</span>] = <span class="st">"ok"</span>
+    <span class="kw">except</span> <span class="cl">Exception</span> <span class="kw">as</span> e:
+        entry[<span class="st">"status"</span>] = <span class="st">"error"</span>
+        entry[<span class="st">"error"</span>] = str(e)
+        <span class="kw">raise</span>
+    <span class="kw">finally</span>:
+        entry[<span class="st">"duration_ms"</span>] = round((time.perf_counter() - start) * <span class="num">1000</span>, <span class="num">1</span>)
+        logger.info(json.dumps(entry))
+        TRACE_STORE.append(entry)
+        <span class="kw">if</span> len(TRACE_STORE) > <span class="num">500</span>:
+            TRACE_STORE.pop(<span class="num">0</span>)   <span class="cm"># keep recent only
+
+# API endpoint to get traces for admin dashboard
+</span><span class="kw">def</span> <span class="fn">get_traces</span>(limit=<span class="num">50</span>) -> <span class="cl">List</span>[<span class="cl">Dict</span>]:
+    <span class="kw">return</span> TRACE_STORE[-limit:]</pre>
+</section>
+
+<!-- ===== AGENT ===== -->
+<section id="agents">
+  <div class="section-label" style="color:var(--muted)">Orchestration</div>
+  <h2>Lightweight LangGraph Agent</h2>
+  <p>LangGraph replaces both the manual Planner/Retriever/Generator/Validator classes from the original project AND the Kafka consumer. It's a proper state machine — each node is one pipeline phase, and the state carries the data between them.</p>
+
+<pre><span class="file-tag">app/agents/rag_agent.py</span>
+<span class="cm"># LangGraph workflow — 4 nodes, each = one RAG phase
+# State flows: retrieve → generate → evaluate → respond
+# No Kafka needed — async Python handles concurrency fine for a chatbot</span>
+
+<span class="kw">from</span> langgraph.graph <span class="kw">import</span> StateGraph, END
+<span class="kw">from</span> typing <span class="kw">import</span> TypedDict, List
+<span class="kw">from</span> app.pipeline.retriever <span class="kw">import</span> Retriever
+<span class="kw">from</span> app.pipeline.generator <span class="kw">import</span> Generator
+<span class="kw">from</span> app.pipeline.evaluator <span class="kw">import</span> Evaluator
+<span class="kw">from</span> app.config <span class="kw">import</span> settings
+
+retriever = Retriever()
+generator = Generator()
+evaluator = Evaluator()
+
+<span class="kw">class</span> <span class="cl">RAGState</span>(TypedDict):
+    question: <span class="cl">str</span>
+    chunks: <span class="cl">List</span>          <span class="cm"># filled by retrieve node</span>
+    generation: dict         <span class="cm"># filled by generate node</span>
+    eval_scores: dict        <span class="cm"># filled by evaluate node</span>
+
+<span class="kw">def</span> <span class="fn">retrieve_node</span>(state: <span class="cl">RAGState</span>) -> <span class="cl">RAGState</span>:
+    chunks = retriever.retrieve(state[<span class="st">"question"</span>])
+    <span class="kw">return</span> {**state, <span class="st">"chunks"</span>: chunks}
+
+<span class="kw">def</span> <span class="fn">generate_node</span>(state: <span class="cl">RAGState</span>) -> <span class="cl">RAGState</span>:
+    gen = generator.generate(state[<span class="st">"question"</span>], state[<span class="st">"chunks"</span>])
+    <span class="kw">return</span> {**state, <span class="st">"generation"</span>: gen}
+
+<span class="kw">def</span> <span class="fn">evaluate_node</span>(state: <span class="cl">RAGState</span>) -> <span class="cl">RAGState</span>:
+    <span class="kw">if not</span> settings.EVAL_ENABLED:
+        <span class="kw">return</span> {**state, <span class="st">"eval_scores"</span>: {}}
+    scores = evaluator.score(
+        state[<span class="st">"question"</span>],
+        state[<span class="st">"generation"</span>][<span class="st">"answer"</span>],
+        state[<span class="st">"chunks"</span>]
+    )
+    <span class="kw">return</span> {**state, <span class="st">"eval_scores"</span>: scores}
+
+<span class="cm"># Build the graph</span>
+graph = StateGraph(RAGState)
+graph.add_node(<span class="st">"retrieve"</span>,  retrieve_node)
+graph.add_node(<span class="st">"generate"</span>,  generate_node)
+graph.add_node(<span class="st">"evaluate"</span>,  evaluate_node)
+graph.set_entry_point(<span class="st">"retrieve"</span>)
+graph.add_edge(<span class="st">"retrieve"</span>,  <span class="st">"generate"</span>)
+graph.add_edge(<span class="st">"generate"</span>,  <span class="st">"evaluate"</span>)
+graph.add_edge(<span class="st">"evaluate"</span>,  END)
+rag_pipeline = graph.compile()
+
+<span class="kw">def</span> <span class="fn">run_rag</span>(question: <span class="cl">str</span>) -> <span class="cl">RAGState</span>:
+    <span class="kw">return</span> rag_pipeline.invoke({<span class="st">"question"</span>: question, <span class="st">"chunks"</span>: [], <span class="st">"generation"</span>: {}, <span class="st">"eval_scores"</span>: {}})</pre>
+</section>
+
+<!-- ===== API ===== -->
+<section id="api">
+  <div class="section-label" style="color:var(--muted)">API</div>
+  <h2>FastAPI — All Routes</h2>
+
+<pre><span class="file-tag">app/main.py</span>
+<span class="kw">from</span> fastapi <span class="kw">import</span> FastAPI, UploadFile, File, HTTPException
+<span class="kw">from</span> fastapi.responses <span class="kw">import</span> StreamingResponse, FileResponse
+<span class="kw">from</span> fastapi.staticfiles <span class="kw">import</span> StaticFiles
+<span class="kw">from</span> app.pipeline.ingestion <span class="kw">import</span> DocumentIngester
+<span class="kw">from</span> app.pipeline.embedder <span class="kw">import</span> Embedder
+<span class="kw">from</span> app.agents.rag_agent <span class="kw">import</span> run_rag
+<span class="kw">from</span> app.pipeline.observer <span class="kw">import</span> get_traces
+<span class="kw">from</span> app.db <span class="kw">import</span> get_history, get_eval_history
+<span class="kw">from</span> app.config <span class="kw">import</span> settings
+<span class="kw">from</span> app.cache <span class="kw">import</span> get_cache, set_cache
+<span class="kw">import</span> shutil, hashlib
+<span class="kw">from</span> pathlib <span class="kw">import</span> Path
+
+app = FastAPI(title=<span class="st">"RAG Learn"</span>)
+app.mount(<span class="st">"/ui"</span>, StaticFiles(directory=<span class="st">"ui"</span>, html=<span class="kw">True</span>), name=<span class="st">"ui"</span>)
+
+ingester = DocumentIngester()
+embedder = Embedder()
+
+<span class="cm"># ---- UPLOAD ----</span>
+@app.post(<span class="st">"/upload"</span>)
+<span class="kw">async def</span> upload(file: UploadFile = File(...)):
+    <span class="cm">"""Phase 1+2: Ingest document and embed it."""</span>
+    dest = Path(<span class="st">"data/uploads"</span>) / file.filename
+    dest.parent.mkdir(exist_ok=<span class="kw">True</span>)
+    <span class="kw">with</span> dest.open(<span class="st">"wb"</span>) <span class="kw">as</span> f:
+        shutil.copyfileobj(file.file, f)
+
+    pages = ingester.load(str(dest))
+    stats = embedder.embed_and_store(pages)
+    <span class="kw">return</span> {<span class="st">"status"</span>: <span class="st">"indexed"</span>, <span class="st">"filename"</span>: file.filename, **stats}
+
+<span class="cm"># ---- QUERY ----</span>
+@app.get(<span class="st">"/ask"</span>)
+<span class="kw">async def</span> ask(q: <span class="cl">str</span>):
+    <span class="cm">"""Full RAG pipeline: retrieve → generate → evaluate."""</span>
+    <span class="cm"># Check cache first</span>
+    cache_key = hashlib.md5(q.encode()).hexdigest()
+    <span class="kw">if</span> cached := get_cache(cache_key):
+        cached[<span class="st">"cached"</span>] = <span class="kw">True</span>
+        <span class="kw">return</span> cached
+
+    result = run_rag(q)
+
+    response = {
+        <span class="st">"answer"</span>:     result[<span class="st">"generation"</span>][<span class="st">"answer"</span>],
+        <span class="st">"sources"</span>:    result[<span class="st">"generation"</span>][<span class="st">"sources"</span>],
+        <span class="st">"chunks"</span>:     result[<span class="st">"chunks"</span>],      <span class="cm"># full retrieved chunks shown in UI</span>
+        <span class="st">"eval"</span>:       result[<span class="st">"eval_scores"</span>],
+        <span class="st">"cached"</span>:     <span class="kw">False</span>
+    }
+    set_cache(cache_key, response)
+    <span class="kw">return</span> response
+
+<span class="cm"># ---- STREAM ----</span>
+@app.get(<span class="st">"/ask-stream"</span>)
+<span class="kw">async def</span> ask_stream(q: <span class="cl">str</span>):
+    <span class="cm">"""SSE streaming — tokens appear as they're generated."""</span>
+    <span class="kw">from</span> app.pipeline.retriever <span class="kw">import</span> Retriever
+    <span class="kw">from</span> app.llm.base <span class="kw">import</span> get_llm
+
+    retriever = Retriever()
+    chunks = retriever.retrieve(q)
+    llm = get_llm()
+
+    context = <span class="st">"\n\n"</span>.join(c[<span class="st">"text"</span>] <span class="kw">for</span> c <span class="kw">in</span> chunks)
+    prompt = f<span class="st">"Context:\n{context}\n\nQuestion: {q}\nAnswer:"</span>
+
+    <span class="kw">def</span> <span class="fn">event_stream</span>():
+        <span class="kw">for</span> token <span class="kw">in</span> llm.generate_stream(prompt):
+            <span class="kw">yield</span> f<span class="st">"data: {token}\n\n"</span>
+        <span class="kw">yield</span> <span class="st">"data: [DONE]\n\n"</span>
+
+    <span class="kw">return</span> StreamingResponse(event_stream(), media_type=<span class="st">"text/event-stream"</span>)
+
+<span class="cm"># ---- ADMIN ----</span>
+@app.get(<span class="st">"/admin/traces"</span>)
+<span class="kw">async def</span> traces():
+    <span class="kw">return</span> get_traces()
+
+@app.get(<span class="st">"/admin/evals"</span>)
+<span class="kw">async def</span> evals():
+    <span class="kw">return</span> get_eval_history()
+
+@app.get(<span class="st">"/admin/history"</span>)
+<span class="kw">async def</span> history():
+    <span class="kw">return</span> get_history()
+
+@app.get(<span class="st">"/admin/config"</span>)
+<span class="kw">async def</span> get_config():
+    <span class="kw">return</span> settings.dict()
+
+@app.post(<span class="st">"/admin/config"</span>)
+<span class="kw">async def</span> update_config(cfg: dict):
+    <span class="cm"># Hot-update config at runtime (chunk_size, top_k, etc.)</span>
+    <span class="kw">for</span> k, v <span class="kw">in</span> cfg.items():
+        <span class="kw">if</span> hasattr(settings, k.upper()):
+            setattr(settings, k.upper(), v)
+    <span class="kw">return</span> {<span class="st">"updated"</span>: cfg}</pre>
+</section>
+
+<!-- ===== UI ===== -->
+<section id="ui">
+  <div class="section-label" style="color:var(--muted)">Frontend</div>
+  <h2>UI — Chat + Admin Dashboard</h2>
+  <p>The UI is the learning tool. The chat window shows not just the answer but the retrieved chunks with their scores. The admin panel shows phase latencies, RAGAS scores over time, and lets you tune parameters live.</p>
+
+  <h3>What the Chat UI shows per query</h3>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">📨 Retrieved Chunks Panel</div>
+      <p style="font-size:13px;">Each retrieved chunk shown with its source filename, page number, and rerank score (0–1). This lets you see <em>why</em> the LLM said what it said.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">📊 RAGAS Scores</div>
+      <p style="font-size:13px;">Faithfulness / Relevancy / Context Precision shown as colored badges after each response. You immediately see if retrieval quality is degrading.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">⚡ Phase Timings</div>
+      <p style="font-size:13px;">Ingestion: Xms / Embedding: Xms / Retrieval: Xms / Generation: Xms. You can see which phase is your bottleneck.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🔍 Prompt Viewer</div>
+      <p style="font-size:13px;">Expandable panel showing the exact prompt sent to the LLM including the injected context. The most educational part — see exactly what the LLM received.</p>
+    </div>
+  </div>
+
+  <h3>Key JavaScript for the chat UI</h3>
+<pre><span class="file-tag">ui/index.html — core JS</span>
+<span class="cm">// After sending a question, render the full RAG trace</span>
+<span class="kw">async function</span> <span class="fn">sendQuestion</span>(question) {
+    showLoading();
+
+    <span class="cm">// Call /ask — returns answer + chunks + eval scores</span>
+    <span class="kw">const</span> res = <span class="kw">await</span> fetch(`/ask?q=${encodeURIComponent(question)}`);
+    <span class="kw">const</span> data = <span class="kw">await</span> res.json();
+
+    <span class="cm">// Render main answer</span>
+    renderAnswer(data.answer, data.cached);
+
+    <span class="cm">// Show retrieved chunks with scores — THE LEARNING PART</span>
+    renderChunks(data.chunks);
+
+    <span class="cm">// Show RAGAS evaluation scores</span>
+    renderEvalScores(data.eval);
+}
+
+<span class="kw">function</span> <span class="fn">renderChunks</span>(chunks) {
+    <span class="kw">const</span> container = document.getElementById(<span class="st">'chunks-panel'</span>);
+    container.innerHTML = chunks.map((c, i) => `
+        &lt;div class="chunk"&gt;
+          &lt;div class="chunk-header"&gt;
+            &lt;span class="chunk-num"&gt;#${i+1}&lt;/span&gt;
+            &lt;span class="chunk-source"&gt;${c.source} p.${c.page}&lt;/span&gt;
+            &lt;span class="chunk-score" style="color:${scoreColor(c.rerank_score)}"&gt;
+              score: ${c.rerank_score}
+            &lt;/span&gt;
+          &lt;/div&gt;
+          &lt;p class="chunk-text"&gt;${c.text.substring(0,300)}...&lt;/p&gt;
+        &lt;/div&gt;
+    `).join('');
+}
+
+<span class="kw">function</span> <span class="fn">renderEvalScores</span>(eval_scores) {
+    <span class="kw">if</span> (!eval_scores || !eval_scores.faithfulness) <span class="kw">return</span>;
+    document.getElementById(<span class="st">'eval-panel'</span>).innerHTML = `
+        &lt;span class="score-badge ${evalClass(eval_scores.faithfulness)}"&gt;
+          Faithfulness: ${eval_scores.faithfulness}
+        &lt;/span&gt;
+        &lt;span class="score-badge ${evalClass(eval_scores.answer_relevancy)}"&gt;
+          Relevancy: ${eval_scores.answer_relevancy}
+        &lt;/span&gt;
+        &lt;span class="score-badge ${evalClass(eval_scores.context_precision)}"&gt;
+          Context Precision: ${eval_scores.context_precision}
+        &lt;/span&gt;
+    `;
+}
+
+<span class="cm">// Score color: red &lt; 0.5 | orange 0.5-0.7 | green &gt; 0.7</span>
+<span class="kw">const</span> scoreColor = s => s > <span class="num">0.7</span> ? <span class="st">'#2d6a4f'</span> : s > <span class="num">0.5</span> ? <span class="st">'#e8a838'</span> : <span class="st">'#c84b31'</span>;</pre>
+</section>
+
+<!-- ===== CLONE ===== -->
+<section id="clone">
+  <div class="section-label" style="color:var(--muted)">Getting Started</div>
+  <h2>Clone &amp; Run — Step by Step</h2>
+
+  <ul class="steps">
+    <li data-n="1">
+      <strong>Prerequisites:</strong> Docker Desktop (8GB+ memory), Git.<br/>
+      Optionally: <code>ollama pull llama3</code> for local LLM. Or set <code>LLM_PROVIDER=openai</code> in .env.
+    </li>
+    <li data-n="2">
+      <strong>Create project directory and all files</strong><br/>
+      <code>mkdir D:\rag-learn && cd D:\rag-learn</code><br/>
+      Then create each file listed in this guide. Or clone from your repo if you push it to GitHub.
+    </li>
+    <li data-n="3">
+      <strong>Start infrastructure (2 services, not 6)</strong><br/>
+      <code>docker-compose up -d qdrant redis</code><br/>
+      Verify: <code>curl http://localhost:6333/collections</code> → <code>{"result":{"collections":[]}}</code>
+    </li>
+    <li data-n="4">
+      <strong>Build and start the API</strong><br/>
+      <code>docker-compose up -d api</code><br/>
+      Verify: <code>curl http://localhost:8000/docs</code> → FastAPI Swagger UI opens
+    </li>
+    <li data-n="5">
+      <strong>Upload your first document</strong><br/>
+      <code>curl -F "file=@yourfile.pdf" http://localhost:8000/upload</code><br/>
+      You should see: <code>{"status":"indexed","chunks":47,"avg_chunk_len":412}</code>
+    </li>
+    <li data-n="6">
+      <strong>Ask your first question</strong><br/>
+      <code>curl "http://localhost:8000/ask?q=What is this document about?"</code><br/>
+      Response includes <code>answer</code>, <code>sources</code>, <code>chunks</code> with scores, and <code>eval</code> scores.
+    </li>
+    <li data-n="7">
+      <strong>Open the UI</strong><br/>
+      Browser: <code>http://localhost:8000/ui/index.html</code> — Chat UI<br/>
+      Browser: <code>http://localhost:8000/ui/admin.html</code> — Admin panel with metrics
+    </li>
+    <li data-n="8">
+      <strong>Open Qdrant Dashboard</strong><br/>
+      Browser: <code>http://localhost:6333/dashboard</code> — See your vectors, run searches, inspect the collection. This is the best way to understand what's in your vector DB.
+    </li>
+  </ul>
+</section>
+
+<!-- ===== DEBUG ===== -->
+<section id="debug">
+  <div class="section-label" style="color:var(--muted)">Troubleshooting</div>
+  <h2>Debug Playbook</h2>
+
+  <h3>The Learning Experiments to Run</h3>
+  <table>
+    <tr><th>Experiment</th><th>How to do it</th><th>What you learn</th></tr>
+    <tr>
+      <td>Change chunk size</td>
+      <td>Admin UI → chunk_size: 128 vs 1024. Re-upload. Compare retrieval scores.</td>
+      <td>How chunking affects both retrieval precision and context quality</td>
+    </tr>
+    <tr>
+      <td>Change alpha (hybrid weight)</td>
+      <td>Admin UI → hybrid_alpha: 0.0 vs 1.0 vs 0.5. Ask same question.</td>
+      <td>When keyword search beats semantic search (exact terms vs concept)</td>
+    </tr>
+    <tr>
+      <td>Compare LLMs</td>
+      <td>.env → LLM_PROVIDER=openai. Same question. Compare faithfulness score.</td>
+      <td>The LLM matters less than retrieval quality — surprising for many</td>
+    </tr>
+    <tr>
+      <td>Break retrieval intentionally</td>
+      <td>Ask a question about something NOT in your documents.</td>
+      <td>Faithfulness should stay high (LLM says "I don't know"). If it's low, you have hallucination.</td>
+    </tr>
+    <tr>
+      <td>Watch phase timings</td>
+      <td>/admin/traces after a query</td>
+      <td>Identify your actual bottleneck: usually embedding or LLM, rarely retrieval</td>
+    </tr>
+  </table>
+
+  <h3>Common Errors</h3>
+  <table>
+    <tr><th>Error</th><th>Cause</th><th>Fix</th></tr>
+    <tr>
+      <td><code>qdrant connection refused</code></td>
+      <td>Qdrant not started / wrong host</td>
+      <td><code>docker-compose up -d qdrant</code>. Check .env: <code>QDRANT_HOST=http://qdrant:6333</code> (not localhost)</td>
+    </tr>
+    <tr>
+      <td><code>No collection "rag_docs"</code></td>
+      <td>Embedder._ensure_collection not called</td>
+      <td>Restart API. Collection is created on first startup.</td>
+    </tr>
+    <tr>
+      <td>RAGAS hangs forever</td>
+      <td>RAGAS uses an LLM — Ollama too slow</td>
+      <td>Set <code>EVAL_ENABLED=false</code> in .env for development. Enable for final testing.</td>
+    </tr>
+    <tr>
+      <td>Empty context in answer</td>
+      <td>No documents indexed OR wrong collection name</td>
+      <td>Check Qdrant dashboard at :6333/dashboard for collection contents</td>
+    </tr>
+    <tr>
+      <td>Ollama timeout</td>
+      <td>LLM too slow or not running</td>
+      <td>Run <code>ollama serve</code> locally. Or switch to <code>LLM_PROVIDER=openai</code></td>
+    </tr>
+  </table>
+
+  <div class="callout tip">
+    <strong>Port reference:</strong> API: 8000 | Qdrant REST+Dashboard: 6333 | Redis: 6379 | Ollama (host): 11434
+  </div>
+</section>
+
+</main>
+</div>
+
+</body>
+</html>

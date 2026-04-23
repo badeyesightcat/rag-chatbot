@@ -1,0 +1,26 @@
+fastapi
+uvicorn[standard]
+pydantic-settings
+python-dotenv
+httpx
+
+# RAG pipeline
+langchain
+langgraph
+qdrant-client
+sentence-transformers       # embedding: BAAI/bge-m3
+rank-bm25                   # BM25 sparse retrieval
+
+# Document parsing
+unstructured[pdf,docx]
+pymupdf
+
+# LLM clients
+openai                      # also works for local Ollama-compatible APIs
+
+# Evaluation
+ragas
+
+# Cache & DB
+redis
+aiofiles
