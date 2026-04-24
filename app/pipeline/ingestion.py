@@ -66,10 +66,10 @@ class DocumentIngester:
         Log before/after so you can see what's being removed.
         """
         original = page["text"]
-        
-        text = re.sub(r"\n{3,}", "\n\n", original) # collapse blank lines
-        text = re.sub(r" {2,}", " ", text) # collapse spaces
-        text = re.sub(r"[^\x00-\x7F\uAC00-\uD7A3]", "", text) # keep ASCII + Korean
+
+        text = re.sub(r'\n{3,}', '\n\n', original) # collapse blank lines
+        text = re.sub(r' {2,}', ' ', text) # collapse spaces
+        text = re.sub(r'[^\x00-\x7F\uAC00-\uD7A3]', '', text) # keep ASCII + Korean
         text = text.strip()
 
         page["text"] = text
