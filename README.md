@@ -1,5 +1,10 @@
+# View the content for this project
+
+[See what the project is](https://badeyesightcat.github.io/rag-chatbot/)
+
 ## project structure
 
+```
 /opt/rag-learn/
 ├── docker-compose.yml # Only 3 services: API, Qdrant, Redis
 ├── .env # Environment config
@@ -36,3 +41,4 @@
 └── data/
 ├── uploads/ # User-uploaded documents
 └── rag_learn.db # SQLite database
+```
