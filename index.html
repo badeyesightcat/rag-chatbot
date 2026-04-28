@@ -25,6 +25,7 @@
   --phase4: #2d6a4f;
   --phase5: #7b5ea7;
   --phase6: #d4522a;
+  --phase0: #2e4057;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -495,6 +496,7 @@ tr:hover td { background: var(--paper2); }
   <a href="#infra"><span class="phase-dot" style="background:#7a7060"></span> Infrastructure Setup</a>
 
   <div class="nav-group">RAG Phases</div>
+  <a href="#phase0"><span class="phase-dot" style="background:#2e4057"></span> Phase 0 — Intent Classification</a>
   <a href="#phase1"><span class="phase-dot" style="background:#c84b31"></span> Phase 1 — Ingestion</a>
   <a href="#phase2"><span class="phase-dot" style="background:#e8a838"></span> Phase 2 — Embedding</a>
   <a href="#phase3"><span class="phase-dot" style="background:#2e86ab"></span> Phase 3 — Retrieval</a>
@@ -554,10 +556,15 @@ tr:hover td { background: var(--paper2); }
 <!-- ===== LIFECYCLE ===== -->
 <section id="lifecycle">
   <div class="section-label" style="color:var(--accent)">Mental Model</div>
-  <h2>The RAG Lifecycle — 6 Phases</h2>
-  <p>Before touching a single file, internalize this. Every piece of code in this project maps to exactly one of these phases.</p>
+  <h2>The RAG Lifecycle — 7 Phases</h2>
+  <p>Before touching a single file, internalize this. Every piece of code in this project maps to exactly one of these phases. Phase 0 runs <em>before</em> anything else — it decides whether RAG is even needed.</p>
 
   <div class="lifecycle">
+    <div class="lc-phase" style="background:#edf0f4; border-right:1px solid var(--border)">
+      <div class="lc-num" style="color:var(--phase0)">0</div>
+      <div class="lc-name" style="color:var(--phase0)">Classify</div>
+      <div class="lc-desc">What does the user want?</div>
+    </div>
     <div class="lc-phase" style="background:#fff0ee; border-right:1px solid var(--border)">
       <div class="lc-num" style="color:var(--phase1)">1</div>
       <div class="lc-name" style="color:var(--phase1)">Ingest</div>
@@ -590,10 +597,11 @@ tr:hover td { background: var(--paper2); }
     </div>
   </div>
 
-  <p>The key insight is that RAG is a <strong>pipeline, not a model</strong>. The LLM is only involved in Phase 4. Phases 1–3 determine what information the LLM even sees, and Phases 5–6 tell you if it worked. Most failures come from bad Phase 1–3 decisions, not from the LLM being "bad."</p>
+  <p>The key insight is that RAG is a <strong>pipeline, not a model</strong>. The LLM is only involved in Phase 4. Phase 0 acts as the gatekeeper — it prevents wasting retrieval and generation budget on questions that don't need documents at all. Phases 1–3 determine what information the LLM sees, and Phases 5–6 tell you if it worked.</p>
 
   <table>
     <tr><th>Phase</th><th>Key Question</th><th>Common Mistake</th><th>This Project Does</th></tr>
+    <tr><td style="color:var(--phase0)"><strong>Classify</strong></td><td>Does this need RAG at all?</td><td>Running full retrieval on "hello" or "thanks"</td><td>LLM classifies intent → routes to RAG or direct reply</td></tr>
     <tr><td style="color:var(--phase1)"><strong>Ingest</strong></td><td>Is the text clean?</td><td>Raw PDF with headers/footers noise</td><td>Normalizer strips boilerplate, logs char count</td></tr>
     <tr><td style="color:var(--phase2)"><strong>Embed</strong></td><td>Are chunks the right size?</td><td>512-token fixed chunks cutting sentences</td><td>RecursiveTextSplitter + overlap, stored with metadata</td></tr>
     <tr><td style="color:var(--phase3)"><strong>Retrieve</strong></td><td>Are the right chunks returned?</td><td>Pure vector search misses exact terms</td><td>Hybrid dense+sparse, scores shown in UI</td></tr>
@@ -619,6 +627,7 @@ tr:hover td { background: var(--paper2); }
 <span class="c">│   ├── config.py             # Settings (pydantic-settings)</span>
 │   │
 <span class="d">│   ├── pipeline/</span>             <span class="c"># One folder = one RAG phase</span>
+<span class="c">│   │   ├── classifier.py     # Phase 0: Intent classification (gate before RAG)</span>
 <span class="c">│   │   ├── ingestion.py      # Phase 1: Load, parse, clean</span>
 <span class="c">│   │   ├── embedder.py       # Phase 2: Chunk + embed</span>
 <span class="c">│   │   ├── retriever.py      # Phase 3: Hybrid search + rerank</span>
@@ -749,6 +758,151 @@ ragas
 <span class="cm"># Cache & DB</span>
 redis
 aiofiles</pre>
+</section>
+
+<!-- ===== PHASE 0 ===== -->
+<section id="phase0">
+  <div class="phase-header">
+    <div class="phase-number">00</div>
+    <div class="phase-info">
+      <span class="phase-tag" style="background:rgba(46,64,87,.25); color:#a8bfd4">Phase 0</span>
+      <h3>Intent Classification — The Gate Before RAG</h3>
+      <p>Before the retrieval pipeline runs a single search, this phase asks: <em>what does the user actually want?</em> Not every message needs RAG. Running full vector search on "hi" or "thanks" wastes money, adds latency, and can produce bizarre answers.</p>
+    </div>
+  </div>
+
+  <p><strong>What you learn:</strong> How to build a routing layer that inspects the user's message and decides which path to take — full RAG, direct LLM reply, or a canned response. This is the pattern real production chatbots use.</p>
+
+  <h3>The four intents this classifier recognises</h3>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title" style="color:var(--phase0)">📄 RAG_QUERY</div>
+      <p style="font-size:13px;">A factual question that needs document evidence. <em>"What does the contract say about termination?"</em> → run the full retrieval pipeline.</p>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--accent2)">💬 CHITCHAT</div>
+      <p style="font-size:13px;">Greeting, thanks, small talk. <em>"Hi!", "Thanks!", "How are you?"</em> → skip RAG, reply directly with a short LLM response.</p>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--gold)">🧠 GENERAL_KNOWLEDGE</div>
+      <p style="font-size:13px;">A question answerable from world knowledge alone, not from the uploaded documents. <em>"What is machine learning?"</em> → LLM answers directly without retrieval.</p>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--accent)">🚫 OUT_OF_SCOPE</div>
+      <p style="font-size:13px;">Something the chatbot should not or cannot answer. <em>"Write me a poem", "What's the weather?"</em> → return a polite refusal without any LLM cost.</p>
+    </div>
+  </div>
+
+<pre><span class="file-tag">app/pipeline/classifier.py</span>
+<span class="cm"># =============================================================
+# PHASE 0: INTENT CLASSIFICATION
+# Goal:  Inspect the user's message → assign one of 4 intents
+# Input:  raw user message string
+# Output: { intent, confidence, reason, should_rag }
+#
+# Why LLM-based classification instead of keyword rules?
+#   Rules like "if '?' in message → RAG" break constantly.
+#   "Thanks for explaining machine learning!" has no '?' but
+#   is clearly CHITCHAT. An LLM understands nuance.
+# =============================================================</span>
+
+<span class="kw">from</span> enum <span class="kw">import</span> Enum
+<span class="kw">from</span> app.llm.base <span class="kw">import</span> get_llm
+<span class="kw">from</span> app.pipeline.observer <span class="kw">import</span> log_phase
+<span class="kw">import</span> json, re
+
+<span class="kw">class</span> <span class="cl">Intent</span>(str, Enum):
+    RAG_QUERY         = <span class="st">"RAG_QUERY"</span>          <span class="cm"># needs document retrieval</span>
+    CHITCHAT          = <span class="st">"CHITCHAT"</span>           <span class="cm"># greeting / small talk</span>
+    GENERAL_KNOWLEDGE = <span class="st">"GENERAL_KNOWLEDGE"</span>  <span class="cm"># world knowledge, no docs needed</span>
+    OUT_OF_SCOPE      = <span class="st">"OUT_OF_SCOPE"</span>       <span class="cm"># refusal</span>
+
+<span class="cm"># Canned replies for intents that don't touch the LLM at all
+# OUT_OF_SCOPE gets a fixed reply → zero token cost</span>
+CANNED_REPLIES = {
+    Intent.OUT_OF_SCOPE: <span class="st">"I'm a document assistant. I can only answer questions about the uploaded documents or general knowledge topics."</span>,
+}
+
+CLASSIFIER_PROMPT = <span class="st">"""You are an intent classifier for a document-based RAG chatbot.
+
+Classify the user message into EXACTLY ONE of these intents:
+- RAG_QUERY         : needs information from uploaded documents to answer
+- CHITCHAT          : greeting, thanks, small talk, or casual conversation
+- GENERAL_KNOWLEDGE : answerable from world knowledge, no documents needed
+- OUT_OF_SCOPE      : unrelated requests (creative tasks, weather, jokes, etc.)
+
+Respond with ONLY a JSON object, no other text:
+{
+  "intent": "<one of the four intents above>",
+  "confidence": <float 0.0-1.0>,
+  "reason": "<one sentence explaining your decision>"
+}
+
+User message: {message}"""</span>
+
+<span class="kw">class</span> <span class="cl">IntentClassifier</span>:
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        self.llm = get_llm()
+
+    <span class="kw">def</span> <span class="fn">classify</span>(self, message: <span class="cl">str</span>) -> <span class="cl">dict</span>:
+        <span class="cm">"""
+        Returns a dict with:
+          intent      : Intent enum value
+          confidence  : float 0-1
+          reason      : short explanation (visible in admin UI)
+          should_rag  : bool — the only field rag_agent.py needs to act on
+          direct_reply: str | None — pre-built reply for non-RAG intents
+        """</span>
+        <span class="kw">with</span> log_phase(<span class="st">"classification"</span>, message=message[:80]):
+            raw = self.llm.generate(CLASSIFIER_PROMPT.format(message=message))
+            parsed = self._parse(raw)
+
+        intent = Intent(parsed[<span class="st">"intent"</span>])
+
+        result = {
+            <span class="st">"intent"</span>:       intent.value,
+            <span class="st">"confidence"</span>:   parsed.get(<span class="st">"confidence"</span>, <span class="num">1.0</span>),
+            <span class="st">"reason"</span>:       parsed.get(<span class="st">"reason"</span>, <span class="st">""</span>),
+            <span class="st">"should_rag"</span>:   intent == Intent.RAG_QUERY,
+            <span class="st">"direct_reply"</span>: <span class="kw">None</span>,
+        }
+
+        <span class="cm"># For non-RAG intents, build the reply here so the agent can short-circuit</span>
+        <span class="kw">if</span> intent == Intent.CHITCHAT:
+            result[<span class="st">"direct_reply"</span>] = self.llm.generate(
+                f<span class="st">"Reply briefly and friendly to: {message}"</span>
+            )
+        <span class="kw">elif</span> intent == Intent.GENERAL_KNOWLEDGE:
+            result[<span class="st">"direct_reply"</span>] = self.llm.generate(
+                f<span class="st">"Answer this general knowledge question concisely: {message}"</span>
+            )
+        <span class="kw">elif</span> intent <span class="kw">in</span> CANNED_REPLIES:
+            result[<span class="st">"direct_reply"</span>] = CANNED_REPLIES[intent]  <span class="cm"># zero LLM cost</span>
+
+        <span class="kw">return</span> result
+
+    <span class="kw">def</span> <span class="fn">_parse</span>(self, raw: <span class="cl">str</span>) -> <span class="cl">dict</span>:
+        <span class="cm">"""
+        Safely extract the JSON the LLM returned.
+        LLMs sometimes wrap JSON in markdown fences — strip those first.
+        Falls back to RAG_QUERY if parsing fails (safe default).
+        """</span>
+        <span class="kw">try</span>:
+            <span class="cm"># Strip markdown code fences if present: ```json ... ```</span>
+            cleaned = re.sub(r<span class="st">'^```(?:json)?\s*|\s*```$'</span>, <span class="st">''</span>, raw.strip(), flags=re.MULTILINE)
+            <span class="kw">return</span> json.loads(cleaned)
+        <span class="kw">except</span> (json.JSONDecodeError, KeyError):
+            <span class="cm"># If the LLM returns garbage, default to running RAG</span>
+            <span class="kw">return</span> {<span class="st">"intent"</span>: <span class="st">"RAG_QUERY"</span>, <span class="st">"confidence"</span>: <span class="num">0.5</span>, <span class="st">"reason"</span>: <span class="st">"parse error — defaulting to RAG"</span>}</pre>
+
+  <div class="callout tip">
+    <strong>Why the safe default is RAG_QUERY:</strong> If the classifier fails to parse, it's better to do unnecessary retrieval (a little slow, small cost) than to refuse a legitimate document question entirely. Always fail toward helpfulness, not silence.
+  </div>
+
+  <div class="callout warn">
+    <strong>Learning exercise:</strong> Open the admin panel's trace view and send these five messages one by one. Watch the <code>intent</code> field change: <em>"What does chapter 3 say?"</em> → RAG_QUERY. <em>"Hello!"</em> → CHITCHAT. <em>"What year was Python created?"</em> → GENERAL_KNOWLEDGE. <em>"Write me a poem."</em> → OUT_OF_SCOPE. <em>"Summarize the document"</em> → RAG_QUERY. Notice that the full retrieval pipeline only runs for the first and last.
+  </div>
 </section>
 
 <!-- ===== PHASE 1 ===== -->
@@ -1355,26 +1509,65 @@ TRACE_STORE: List[Dict] = []
   <p>LangGraph replaces both the manual Planner/Retriever/Generator/Validator classes from the original project AND the Kafka consumer. It's a proper state machine — each node is one pipeline phase, and the state carries the data between them.</p>
 
 <pre><span class="file-tag">app/agents/rag_agent.py</span>
-<span class="cm"># LangGraph workflow — 4 nodes, each = one RAG phase
-# State flows: retrieve → generate → evaluate → respond
-# No Kafka needed — async Python handles concurrency fine for a chatbot</span>
+<span class="cm"># LangGraph workflow — 5 nodes, each = one RAG phase
+#
+# Flow with classification:
+#
+#   classify → should_rag? ──Yes──► retrieve → generate → evaluate
+#                          └──No──► direct_respond → END
+#
+# The conditional edge is the key learning here:
+# LangGraph lets you branch the graph based on state values,
+# just like an if/else — but visualisable and traceable.</span>
 
 <span class="kw">from</span> langgraph.graph <span class="kw">import</span> StateGraph, END
-<span class="kw">from</span> typing <span class="kw">import</span> TypedDict, List
+<span class="kw">from</span> typing <span class="kw">import</span> TypedDict, List, Optional
+<span class="kw">from</span> app.pipeline.classifier <span class="kw">import</span> IntentClassifier
 <span class="kw">from</span> app.pipeline.retriever <span class="kw">import</span> Retriever
 <span class="kw">from</span> app.pipeline.generator <span class="kw">import</span> Generator
 <span class="kw">from</span> app.pipeline.evaluator <span class="kw">import</span> Evaluator
 <span class="kw">from</span> app.config <span class="kw">import</span> settings
 
-retriever = Retriever()
-generator = Generator()
-evaluator = Evaluator()
+classifier = IntentClassifier()
+retriever  = Retriever()
+generator  = Generator()
+evaluator  = Evaluator()
 
 <span class="kw">class</span> <span class="cl">RAGState</span>(TypedDict):
-    question: <span class="cl">str</span>
-    chunks: <span class="cl">List</span>          <span class="cm"># filled by retrieve node</span>
-    generation: dict         <span class="cm"># filled by generate node</span>
-    eval_scores: dict        <span class="cm"># filled by evaluate node</span>
+    question:     <span class="cl">str</span>
+    intent:       <span class="cl">str</span>           <span class="cm"># filled by classify node — visible in API response</span>
+    confidence:   <span class="cl">float</span>         <span class="cm"># classifier confidence score</span>
+    should_rag:   <span class="cl">bool</span>          <span class="cm"># True = run retrieval; False = short-circuit</span>
+    direct_reply: Optional[<span class="cl">str</span>] <span class="cm"># pre-built reply for non-RAG intents</span>
+    chunks:       <span class="cl">List</span>          <span class="cm"># filled by retrieve node</span>
+    generation:   dict           <span class="cm"># filled by generate node</span>
+    eval_scores:  dict           <span class="cm"># filled by evaluate node</span>
+
+<span class="cm"># ---- NODE DEFINITIONS ----</span>
+
+<span class="kw">def</span> <span class="fn">classify_node</span>(state: <span class="cl">RAGState</span>) -> <span class="cl">RAGState</span>:
+    <span class="cm">"""Phase 0: classify intent, decide routing."""</span>
+    result = classifier.classify(state[<span class="st">"question"</span>])
+    <span class="kw">return</span> {
+        **state,
+        <span class="st">"intent"</span>:       result[<span class="st">"intent"</span>],
+        <span class="st">"confidence"</span>:   result[<span class="st">"confidence"</span>],
+        <span class="st">"should_rag"</span>:   result[<span class="st">"should_rag"</span>],
+        <span class="st">"direct_reply"</span>: result[<span class="st">"direct_reply"</span>],
+    }
+
+<span class="kw">def</span> <span class="fn">direct_respond_node</span>(state: <span class="cl">RAGState</span>) -> <span class="cl">RAGState</span>:
+    <span class="cm">"""Short-circuit path: wrap direct_reply in generation format for uniform API output."""</span>
+    <span class="kw">return</span> {
+        **state,
+        <span class="st">"chunks"</span>: [],
+        <span class="st">"generation"</span>: {
+            <span class="st">"answer"</span>:  state[<span class="st">"direct_reply"</span>],
+            <span class="st">"prompt"</span>:  <span class="st">"[no retrieval — direct response]"</span>,
+            <span class="st">"sources"</span>: []
+        },
+        <span class="st">"eval_scores"</span>: {}   <span class="cm"># RAGAS skipped for non-RAG responses</span>
+    }
 
 <span class="kw">def</span> <span class="fn">retrieve_node</span>(state: <span class="cl">RAGState</span>) -> <span class="cl">RAGState</span>:
     chunks = retriever.retrieve(state[<span class="st">"question"</span>])
@@ -1394,19 +1587,50 @@ evaluator = Evaluator()
     )
     <span class="kw">return</span> {**state, <span class="st">"eval_scores"</span>: scores}
 
-<span class="cm"># Build the graph</span>
+<span class="cm"># ---- ROUTING FUNCTION ----
+# This is what makes LangGraph different from a plain function chain.
+# After classify_node runs, the graph calls this function to decide
+# which node to execute NEXT — dynamic branching based on state.</span>
+
+<span class="kw">def</span> <span class="fn">route_after_classify</span>(state: <span class="cl">RAGState</span>) -> <span class="cl">str</span>:
+    <span class="cm">"""Returns the name of the next node to run."""</span>
+    <span class="kw">if</span> state[<span class="st">"should_rag"</span>]:
+        <span class="kw">return</span> <span class="st">"retrieve"</span>       <span class="cm"># full pipeline</span>
+    <span class="kw">else</span>:
+        <span class="kw">return</span> <span class="st">"direct_respond"</span> <span class="cm"># short-circuit</span>
+
+<span class="cm"># ---- BUILD THE GRAPH ----</span>
 graph = StateGraph(RAGState)
-graph.add_node(<span class="st">"retrieve"</span>,  retrieve_node)
-graph.add_node(<span class="st">"generate"</span>,  generate_node)
-graph.add_node(<span class="st">"evaluate"</span>,  evaluate_node)
-graph.set_entry_point(<span class="st">"retrieve"</span>)
-graph.add_edge(<span class="st">"retrieve"</span>,  <span class="st">"generate"</span>)
-graph.add_edge(<span class="st">"generate"</span>,  <span class="st">"evaluate"</span>)
-graph.add_edge(<span class="st">"evaluate"</span>,  END)
+
+graph.add_node(<span class="st">"classify"</span>,       classify_node)
+graph.add_node(<span class="st">"direct_respond"</span>, direct_respond_node)
+graph.add_node(<span class="st">"retrieve"</span>,       retrieve_node)
+graph.add_node(<span class="st">"generate"</span>,       generate_node)
+graph.add_node(<span class="st">"evaluate"</span>,       evaluate_node)
+
+graph.set_entry_point(<span class="st">"classify"</span>)  <span class="cm"># always starts here now</span>
+
+<span class="cm"># Conditional edge: classify → (retrieve OR direct_respond) based on route_after_classify</span>
+graph.add_conditional_edges(<span class="st">"classify"</span>, route_after_classify)
+
+graph.add_edge(<span class="st">"retrieve"</span>,       <span class="st">"generate"</span>)
+graph.add_edge(<span class="st">"generate"</span>,       <span class="st">"evaluate"</span>)
+graph.add_edge(<span class="st">"evaluate"</span>,       END)
+graph.add_edge(<span class="st">"direct_respond"</span>, END)   <span class="cm"># short-circuit path ends here</span>
+
 rag_pipeline = graph.compile()
 
 <span class="kw">def</span> <span class="fn">run_rag</span>(question: <span class="cl">str</span>) -> <span class="cl">RAGState</span>:
-    <span class="kw">return</span> rag_pipeline.invoke({<span class="st">"question"</span>: question, <span class="st">"chunks"</span>: [], <span class="st">"generation"</span>: {}, <span class="st">"eval_scores"</span>: {}})</pre>
+    <span class="kw">return</span> rag_pipeline.invoke({
+        <span class="st">"question"</span>:     question,
+        <span class="st">"intent"</span>:       <span class="st">""</span>,
+        <span class="st">"confidence"</span>:   <span class="num">0.0</span>,
+        <span class="st">"should_rag"</span>:   <span class="kw">False</span>,
+        <span class="st">"direct_reply"</span>: <span class="kw">None</span>,
+        <span class="st">"chunks"</span>:       [],
+        <span class="st">"generation"</span>:   {},
+        <span class="st">"eval_scores"</span>:  {}
+    })</pre>
 </section>
 
 <!-- ===== API ===== -->
@@ -1450,7 +1674,7 @@ embedder = Embedder()
 <span class="cm"># ---- QUERY ----</span>
 @app.get(<span class="st">"/ask"</span>)
 <span class="kw">async def</span> ask(q: <span class="cl">str</span>):
-    <span class="cm">"""Full RAG pipeline: retrieve → generate → evaluate."""</span>
+    <span class="cm">"""Full pipeline: classify → (retrieve → generate → evaluate) OR direct reply."""</span>
     <span class="cm"># Check cache first</span>
     cache_key = hashlib.md5(q.encode()).hexdigest()
     <span class="kw">if</span> cached := get_cache(cache_key):
@@ -1462,8 +1686,10 @@ embedder = Embedder()
     response = {
         <span class="st">"answer"</span>:     result[<span class="st">"generation"</span>][<span class="st">"answer"</span>],
         <span class="st">"sources"</span>:    result[<span class="st">"generation"</span>][<span class="st">"sources"</span>],
-        <span class="st">"chunks"</span>:     result[<span class="st">"chunks"</span>],      <span class="cm"># full retrieved chunks shown in UI</span>
+        <span class="st">"chunks"</span>:     result[<span class="st">"chunks"</span>],
         <span class="st">"eval"</span>:       result[<span class="st">"eval_scores"</span>],
+        <span class="st">"intent"</span>:     result[<span class="st">"intent"</span>],       <span class="cm"># e.g. "RAG_QUERY" — shown as badge in UI</span>
+        <span class="st">"confidence"</span>: result[<span class="st">"confidence"</span>],   <span class="cm"># classifier confidence score</span>
         <span class="st">"cached"</span>:     <span class="kw">False</span>
     }
     set_cache(cache_key, response)
@@ -1548,18 +1774,48 @@ embedder = Embedder()
 <span class="kw">async function</span> <span class="fn">sendQuestion</span>(question) {
     showLoading();
 
-    <span class="cm">// Call /ask — returns answer + chunks + eval scores</span>
+    <span class="cm">// Call /ask — returns answer + intent + chunks + eval scores</span>
     <span class="kw">const</span> res = <span class="kw">await</span> fetch(`/ask?q=${encodeURIComponent(question)}`);
     <span class="kw">const</span> data = <span class="kw">await</span> res.json();
 
-    <span class="cm">// Render main answer</span>
+    <span class="cm">// 1. Show intent badge FIRST — tells user which path was taken</span>
+    renderIntentBadge(data.intent, data.confidence);
+
+    <span class="cm">// 2. Render main answer</span>
     renderAnswer(data.answer, data.cached);
 
-    <span class="cm">// Show retrieved chunks with scores — THE LEARNING PART</span>
-    renderChunks(data.chunks);
+    <span class="cm">// 3. Only show retrieval trace if RAG actually ran</span>
+    <span class="kw">if</span> (data.intent === <span class="st">'RAG_QUERY'</span> && data.chunks.length > <span class="num">0</span>) {
+        renderChunks(data.chunks);
+        renderEvalScores(data.eval);
+    } <span class="kw">else</span> {
+        <span class="cm">// Hide the chunks and eval panels for non-RAG responses</span>
+        document.getElementById(<span class="st">'chunks-panel'</span>).innerHTML =
+            <span class="st">'&lt;p class="muted"&gt;No retrieval — answered directly.&lt;/p&gt;'</span>;
+    }
+}
 
-    <span class="cm">// Show RAGAS evaluation scores</span>
-    renderEvalScores(data.eval);
+<span class="cm">// Intent badge: colour-coded so you immediately see which path ran</span>
+<span class="kw">const</span> INTENT_COLORS = {
+    RAG_QUERY:         <span class="st">'#2e4057'</span>,
+    CHITCHAT:          <span class="st">'#2e86ab'</span>,
+    GENERAL_KNOWLEDGE: <span class="st">'#e8a838'</span>,
+    OUT_OF_SCOPE:      <span class="st">'#c84b31'</span>,
+};
+
+<span class="kw">function</span> <span class="fn">renderIntentBadge</span>(intent, confidence) {
+    <span class="kw">const</span> color = INTENT_COLORS[intent] || <span class="st">'#7a7060'</span>;
+    <span class="kw">const</span> pct   = Math.round(confidence * <span class="num">100</span>);
+    document.getElementById(<span class="st">'intent-badge'</span>).innerHTML = `
+        &lt;span style="background:${color}; color:#fff; padding:3px 10px;
+                     border-radius:3px; font-size:11px; font-family:monospace;
+                     letter-spacing:1px;"&gt;
+          ${intent}
+        &lt;/span&gt;
+        &lt;span style="color:#7a7060; font-size:12px; margin-left:6px;"&gt;
+          ${pct}% confidence
+        &lt;/span&gt;
+    `;
 }
 
 <span class="kw">function</span> <span class="fn">renderChunks</span>(chunks) {
@@ -1575,7 +1831,7 @@ embedder = Embedder()
           &lt;/div&gt;
           &lt;p class="chunk-text"&gt;${c.text.substring(0,300)}...&lt;/p&gt;
         &lt;/div&gt;
-    `).join('');
+    `).join(<span class="st">''</span>);
 }
 
 <span class="kw">function</span> <span class="fn">renderEvalScores</span>(eval_scores) {
@@ -1653,6 +1909,10 @@ embedder = Embedder()
   <table>
     <tr><th>Experiment</th><th>How to do it</th><th>What you learn</th></tr>
     <tr>
+      <td>Test all 4 intent paths</td>
+      <td>Send: <em>"What does chapter 3 say?"</em> / <em>"Hi!"</em> / <em>"What is Python?"</em> / <em>"Write a poem"</em>. Watch the intent badge in the UI.</td>
+      <td>How the classifier routes different messages — only RAG_QUERY triggers retrieval</td>
+    </tr>
       <td>Change chunk size</td>
       <td>Admin UI → chunk_size: 128 vs 1024. Re-upload. Compare retrieval scores.</td>
       <td>How chunking affects both retrieval precision and context quality</td>
@@ -1683,6 +1943,10 @@ embedder = Embedder()
   <table>
     <tr><th>Error</th><th>Cause</th><th>Fix</th></tr>
     <tr>
+      <td>Classifier returns wrong intent</td>
+      <td>LLM didn't follow JSON format, or ambiguous message</td>
+      <td><code>_parse()</code> falls back to RAG_QUERY safely. Check the <code>reason</code> field in admin traces to see the classifier's explanation. Refine the <code>CLASSIFIER_PROMPT</code> with more examples.</td>
+    </tr>
       <td><code>qdrant connection refused</code></td>
       <td>Qdrant not started / wrong host</td>
       <td><code>docker-compose up -d qdrant</code>. Check .env: <code>QDRANT_HOST=http://qdrant:6333</code> (not localhost)</td>
