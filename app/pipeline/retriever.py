@@ -17,7 +17,6 @@ from qdrant_client import QdrantClient
 from rank_bm25 import BM25Okapi
 from app.config import settings
 from app.pipeline.observer import log_phase
-from typing import List, Dict
 import numpy as np
 
 RERANKER_MODEL  = "cross-encoder/ms-marco-MiniLM-L-6-v2"   # local model, no API key needed
@@ -43,7 +42,7 @@ class Retriever:
     def __init__(self):
         self.client = QdrantClient(url=settings.QDRANT_HOST)
 
-    def retrieve(self, query: str, top_k=None, top_n=None, alpha=None) -> List[Dict]:
+    def retrieve(self, query: str, top_k=None, top_n=None, alpha=None) -> list[dict]:
         """
         alpha: 0.0 = pure BM25, 1.0 = pure vector, 0.5 = balanced
         Returns list of dicts with text, metadata, AND scores (for UI display)
@@ -77,7 +76,7 @@ class Retriever:
 
             # --- Reciprocal Rank Fusion (RRF) ---
             RRF_K = 60
-            fused: Dict[str, float] = {}
+            fused: dict[str, float] = {}
 
             for rank, hit in enumerate(dense_hits):
                 pid = str(hit.id)

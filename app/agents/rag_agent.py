@@ -2,7 +2,7 @@
 # State flows: retrieve → generate → evaluate → respond
 # No Kafka needed — async Python handles concurrency fine for a chatbot
 from langgraph.graph import StateGraph, END
-from typing import TypedDict, List
+from typing import TypedDict
 from app.pipeline.retriever import Retriever
 from app.pipeline.generator import Generator
 from app.pipeline.evaluator import Evaluator
@@ -14,7 +14,7 @@ evaluator = Evaluator()
 
 class RAGState(TypedDict):
     question: str
-    chunks: List # filled by retrieve node
+    chunks: list # filled by retrieve node
     generation: dict  # filled by generate node
     eval_scores: dict # filled by evaluate nod
 

@@ -7,13 +7,12 @@
 
 import time, json, logging
 from contextlib import contextmanager
-from typing import List, Dict
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger("rag.trace")
 
 # In-memory trace store — last 100 requests visible in admin UI
-TRACE_STORE: List[Dict] = []
+TRACE_STORE: list[dict] = []
 
 @contextmanager
 def log_phase(phase_name: str, **kwargs):
@@ -43,5 +42,5 @@ def log_phase(phase_name: str, **kwargs):
             TRACE_STORE.pop(0) # keep recent only
 
 # API endpoint to get traces for admin dashboard
-def get_traces(limit=50) -> List[Dict]:
+def get_traces(limit=50) -> list[dict]:
     return TRACE_STORE[-limit:]

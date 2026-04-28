@@ -10,12 +10,11 @@ import fitz # PyMuPDF — best PDF parser
 import docx
 
 from pathlib import Path
-from typing import List, Dict
 from app.pipeline.observer import log_phase # Phase 6 logging
 
 class DocumentIngester:
 
-    def load(self, file_path: str) -> List[Dict]: 
+    def load(self, file_path: str) -> list[dict]: 
         """Entry point: detect format and dispatch to correct parser."""
         path = Path(file_path)
         suffix = path.suffix.lower()
@@ -34,7 +33,7 @@ class DocumentIngester:
             cleaned = [self._clean(page) for page in raw_pages]
             return cleaned
         
-    def _parse_pdf(self, path) -> List[Dict]:
+    def _parse_pdf(self, path) -> list[dict]:
         pages = []
         doc = fitz.open(path)
         for i, page in enumerate(doc):
@@ -49,18 +48,18 @@ class DocumentIngester:
             })
         return pages
     
-    def _parse_docx(self, path) -> List[Dict]:
+    def _parse_docx(self, path) -> list[dict]:
         doc = docx.Document(path)
         # Treat each paragraph as a "page" for consistency
         paras = [p.text for p in doc.paragraphs if p.text.strip()]
         full_text = "\n\n".join(paras)
         return [{ "text": full_text, "metadata": { "source": Path(path).name, "page": 1 }}]
     
-    def _parse_text(self, path) -> List[Dict]:
+    def _parse_text(self, path) -> list[dict]:
         text = Path(path).read_text(encoding="utf-8")
         return [{ "text": text, "metadata": { "source": Path(path).name, "page": 1 }}]
     
-    def _clean(self, page: Dict) -> Dict:
+    def _clean(self, page: dict) -> dict:
         """
         Text normalization — THIS IS WHERE MOST BUGS HIDE.
         Log before/after so you can see what's being removed.

@@ -9,7 +9,6 @@
 
 from app.llm.base import get_llm
 from app.pipeline.observer import log_phase
-from typing import List, Dict
 
 PROMPT_TEMPLATE = """You are a helpful assistant. Answer the question using ONLY
 the context below. If the context does not contain the answer, say
@@ -30,7 +29,7 @@ class Generator:
     def __init__(self):
         self.llm = get_llm()
 
-    def generate(self, question: str, retrieved_chunks: List[Dict]) -> Dict:
+    def generate(self, question: str, retrieved_chunks: list[dict]) -> dict:
         # Format context: numbered list with source attribution
         context_parts = []
         for i, chunk in enumerate(retrieved_chunks, 1):
