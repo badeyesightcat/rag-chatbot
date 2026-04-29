@@ -1521,7 +1521,7 @@ TRACE_STORE: List[Dict] = []
 # just like an if/else — but visualisable and traceable.</span>
 
 <span class="kw">from</span> langgraph.graph <span class="kw">import</span> StateGraph, END
-<span class="kw">from</span> typing <span class="kw">import</span> TypedDict, List, Optional
+<span class="kw">from</span> typing <span class="kw">import</span> TypedDict   <span class="cm"># only TypedDict has no built-in replacement</span>
 <span class="kw">from</span> app.pipeline.classifier <span class="kw">import</span> IntentClassifier
 <span class="kw">from</span> app.pipeline.retriever <span class="kw">import</span> Retriever
 <span class="kw">from</span> app.pipeline.generator <span class="kw">import</span> Generator
@@ -1538,10 +1538,10 @@ evaluator  = Evaluator()
     intent:       <span class="cl">str</span>           <span class="cm"># filled by classify node — visible in API response</span>
     confidence:   <span class="cl">float</span>         <span class="cm"># classifier confidence score</span>
     should_rag:   <span class="cl">bool</span>          <span class="cm"># True = run retrieval; False = short-circuit</span>
-    direct_reply: Optional[<span class="cl">str</span>] <span class="cm"># pre-built reply for non-RAG intents</span>
-    chunks:       <span class="cl">List</span>          <span class="cm"># filled by retrieve node</span>
-    generation:   dict           <span class="cm"># filled by generate node</span>
-    eval_scores:  dict           <span class="cm"># filled by evaluate node</span>
+    direct_reply: <span class="cl">str</span> | <span class="kw">None</span>    <span class="cm"># pre-built reply for non-RAG intents</span>
+    chunks:       <span class="cl">list</span>          <span class="cm"># filled by retrieve node</span>
+    generation:   <span class="cl">dict</span>          <span class="cm"># filled by generate node</span>
+    eval_scores:  <span class="cl">dict</span>          <span class="cm"># filled by evaluate node</span>
 
 <span class="cm"># ---- NODE DEFINITIONS ----</span>
 
@@ -1913,6 +1913,7 @@ embedder = Embedder()
       <td>Send: <em>"What does chapter 3 say?"</em> / <em>"Hi!"</em> / <em>"What is Python?"</em> / <em>"Write a poem"</em>. Watch the intent badge in the UI.</td>
       <td>How the classifier routes different messages — only RAG_QUERY triggers retrieval</td>
     </tr>
+    <tr>
       <td>Change chunk size</td>
       <td>Admin UI → chunk_size: 128 vs 1024. Re-upload. Compare retrieval scores.</td>
       <td>How chunking affects both retrieval precision and context quality</td>
@@ -1947,6 +1948,7 @@ embedder = Embedder()
       <td>LLM didn't follow JSON format, or ambiguous message</td>
       <td><code>_parse()</code> falls back to RAG_QUERY safely. Check the <code>reason</code> field in admin traces to see the classifier's explanation. Refine the <code>CLASSIFIER_PROMPT</code> with more examples.</td>
     </tr>
+    <tr>
       <td><code>qdrant connection refused</code></td>
       <td>Qdrant not started / wrong host</td>
       <td><code>docker-compose up -d qdrant</code>. Check .env: <code>QDRANT_HOST=http://qdrant:6333</code> (not localhost)</td>
@@ -1976,6 +1978,929 @@ embedder = Embedder()
   <div class="callout tip">
     <strong>Port reference:</strong> API: 8000 | Qdrant REST+Dashboard: 6333 | Redis: 6379 | Ollama (host): 11434
   </div>
+</section>
+
+<!-- ===== MISSING FILES ===== -->
+<section id="missing-files">
+  <div class="section-label" style="color:var(--muted)">Supporting Files</div>
+  <h2>Remaining Files — Complete Code</h2>
+  <p>These files are called throughout the project but their full code was not shown yet. Every one of them is required for the project to run.</p>
+
+  <!-- config.py -->
+  <h3>app/config.py</h3>
+  <p>Single source of truth for all settings. Uses <code>pydantic-settings</code> which auto-reads from the <code>.env</code> file and validates types. Any part of the app imports <code>settings</code> from here — never reads <code>os.getenv()</code> directly.</p>
+<pre><span class="file-tag">app/config.py</span>
+<span class="kw">from</span> pydantic_settings <span class="kw">import</span> BaseSettings
+
+<span class="kw">class</span> <span class="cl">Settings</span>(BaseSettings):
+    <span class="cm"># LLM</span>
+    LLM_PROVIDER:            <span class="cl">str</span>   = <span class="st">"ollama"</span>
+    OLLAMA_HOST:             <span class="cl">str</span>   = <span class="st">"http://host.docker.internal:11434"</span>
+    OLLAMA_MODEL:            <span class="cl">str</span>   = <span class="st">"llama3"</span>
+    OPENAI_API_KEY:          <span class="cl">str</span>   = <span class="st">""</span>
+    OPENAI_MODEL:            <span class="cl">str</span>   = <span class="st">"gpt-4o-mini"</span>
+    OPENAI_EMBEDDING_MODEL:  <span class="cl">str</span>   = <span class="st">"text-embedding-3-small"</span>
+
+    <span class="cm"># Services</span>
+    QDRANT_HOST:             <span class="cl">str</span>   = <span class="st">"http://qdrant:6333"</span>
+    REDIS_HOST:              <span class="cl">str</span>   = <span class="st">"redis"</span>
+
+    <span class="cm"># RAG pipeline parameters — all hot-swappable via Admin UI</span>
+    CHUNK_SIZE:              <span class="cl">int</span>   = <span class="num">512</span>
+    CHUNK_OVERLAP:           <span class="cl">int</span>   = <span class="num">64</span>
+    TOP_K:                   <span class="cl">int</span>   = <span class="num">10</span>   <span class="cm"># candidates fetched before reranking</span>
+    TOP_N:                   <span class="cl">int</span>   = <span class="num">3</span>    <span class="cm"># final chunks passed to generator</span>
+    HYBRID_ALPHA:            <span class="cl">float</span> = <span class="num">0.5</span>  <span class="cm"># 0=BM25 only, 1=vector only</span>
+
+    <span class="cm"># Feature flags</span>
+    EVAL_ENABLED:            <span class="cl">bool</span>  = <span class="kw">True</span>  <span class="cm"># set False to skip RAGAS during dev</span>
+
+    <span class="kw">class</span> <span class="cl">Config</span>:
+        env_file = <span class="st">".env"</span>        <span class="cm"># auto-loads .env on startup</span>
+        extra    = <span class="st">"ignore"</span>      <span class="cm"># ignore unknown keys in .env</span>
+
+settings = Settings()
+<span class="cm"># Usage anywhere in the project:
+#   from app.config import settings
+#   settings.TOP_K, settings.OPENAI_API_KEY, etc.</span></pre>
+
+  <!-- db.py -->
+  <h3>app/db.py</h3>
+  <p>SQLite persistence layer. Two tables: <code>chat_history</code> stores every question and answer, <code>eval_results</code> stores RAGAS scores per query. The admin dashboard reads both tables to show history and evaluation trends over time.</p>
+<pre><span class="file-tag">app/db.py</span>
+<span class="kw">import</span> sqlite3
+<span class="kw">from</span> pathlib <span class="kw">import</span> Path
+<span class="kw">import</span> json
+
+DB_PATH = <span class="st">"data/rag_learn.db"</span>
+
+<span class="kw">def</span> <span class="fn">_connect</span>():
+    Path(<span class="st">"data"</span>).mkdir(exist_ok=<span class="kw">True</span>)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row   <span class="cm"># rows behave like dicts</span>
+    <span class="kw">return</span> conn
+
+<span class="kw">def</span> <span class="fn">init_db</span>():
+    <span class="cm">"""Create tables if they don't exist. Called once on startup."""</span>
+    conn = _connect()
+    conn.executescript(<span class="st">"""
+        CREATE TABLE IF NOT EXISTS chat_history (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            question  TEXT NOT NULL,
+            answer    TEXT NOT NULL,
+            intent    TEXT,
+            cached    INTEGER DEFAULT 0,
+            created   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS eval_results (
+            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            question           TEXT NOT NULL,
+            answer             TEXT NOT NULL,
+            faithfulness       REAL,
+            answer_relevancy   REAL,
+            context_precision  REAL,
+            created            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """</span>)
+    conn.commit()
+    conn.close()
+
+<span class="kw">def</span> <span class="fn">save_chat</span>(question: <span class="cl">str</span>, answer: <span class="cl">str</span>, intent: <span class="cl">str</span> = <span class="st">""</span>, cached: <span class="cl">bool</span> = <span class="kw">False</span>):
+    conn = _connect()
+    conn.execute(
+        <span class="st">"INSERT INTO chat_history (question, answer, intent, cached) VALUES (?,?,?,?)"</span>,
+        (question, answer, intent, int(cached))
+    )
+    conn.commit()
+    conn.close()
+
+<span class="kw">def</span> <span class="fn">save_eval_result</span>(question: <span class="cl">str</span>, answer: <span class="cl">str</span>, scores: <span class="cl">dict</span>):
+    conn = _connect()
+    conn.execute(
+        <span class="st">"""INSERT INTO eval_results
+           (question, answer, faithfulness, answer_relevancy, context_precision)
+           VALUES (?,?,?,?,?)"""</span>,
+        (
+            question, answer,
+            scores.get(<span class="st">"faithfulness"</span>),
+            scores.get(<span class="st">"answer_relevancy"</span>),
+            scores.get(<span class="st">"context_precision"</span>)
+        )
+    )
+    conn.commit()
+    conn.close()
+
+<span class="kw">def</span> <span class="fn">get_history</span>(limit: <span class="cl">int</span> = <span class="num">50</span>) -> <span class="cl">list</span>[<span class="cl">dict</span>]:
+    <span class="cm">"""Returns recent chat history for admin dashboard."""</span>
+    conn = _connect()
+    rows = conn.execute(
+        <span class="st">"SELECT * FROM chat_history ORDER BY created DESC LIMIT ?"</span>, (limit,)
+    ).fetchall()
+    conn.close()
+    <span class="kw">return</span> [dict(r) <span class="kw">for</span> r <span class="kw">in</span> rows]
+
+<span class="kw">def</span> <span class="fn">get_eval_history</span>(limit: <span class="cl">int</span> = <span class="num">100</span>) -> <span class="cl">list</span>[<span class="cl">dict</span>]:
+    <span class="cm">"""Returns RAGAS scores over time — plotted as line chart in admin."""</span>
+    conn = _connect()
+    rows = conn.execute(
+        <span class="st">"SELECT * FROM eval_results ORDER BY created DESC LIMIT ?"</span>, (limit,)
+    ).fetchall()
+    conn.close()
+    <span class="kw">return</span> [dict(r) <span class="kw">for</span> r <span class="kw">in</span> rows]</pre>
+
+  <!-- cache.py -->
+  <h3>app/cache.py</h3>
+  <p>Redis-based response cache. Identical questions skip the full pipeline and return the cached answer instantly. TTL is 300 seconds — after 5 minutes, the cache expires and the next query runs the full pipeline again.</p>
+<pre><span class="file-tag">app/cache.py</span>
+<span class="kw">import</span> redis, json
+<span class="kw">from</span> app.config <span class="kw">import</span> settings
+
+<span class="cm"># Single Redis connection shared across all requests</span>
+_client = redis.Redis(host=settings.REDIS_HOST, port=<span class="num">6379</span>, decode_responses=<span class="kw">True</span>)
+
+CACHE_TTL = <span class="num">300</span>   <span class="cm"># seconds — 5 minutes</span>
+
+<span class="kw">def</span> <span class="fn">get_cache</span>(key: <span class="cl">str</span>) -> <span class="cl">dict</span> | <span class="kw">None</span>:
+    <span class="cm">"""
+    Returns the cached response dict, or None if not found / expired.
+    main.py uses this with the walrus operator:
+        if cached := get_cache(key): return cached
+    """</span>
+    <span class="kw">try</span>:
+        raw = _client.get(key)
+        <span class="kw">return</span> json.loads(raw) <span class="kw">if</span> raw <span class="kw">else None</span>
+    <span class="kw">except</span> redis.RedisError:
+        <span class="kw">return None</span>   <span class="cm"># cache miss on any Redis error — degrade gracefully</span>
+
+<span class="kw">def</span> <span class="fn">set_cache</span>(key: <span class="cl">str</span>, value: <span class="cl">dict</span>):
+    <span class="cm">"""Store a response dict with TTL. Silently fails if Redis is down."""</span>
+    <span class="kw">try</span>:
+        _client.setex(key, CACHE_TTL, json.dumps(value))
+    <span class="kw">except</span> redis.RedisError:
+        <span class="kw">pass</span>   <span class="cm"># cache write failure is non-fatal — app still works</span>
+
+<span class="kw">def</span> <span class="fn">clear_cache</span>():
+    <span class="cm">"""Wipe all cached responses. Called from admin UI after re-indexing documents."""</span>
+    <span class="kw">try</span>:
+        _client.flushdb()
+    <span class="kw">except</span> redis.RedisError:
+        <span class="kw">pass</span></pre>
+
+  <!-- openai.py LLM adapter -->
+  <h3>app/llm/openai.py</h3>
+  <p>The OpenAI LLM adapter. Implements the same <code>BaseLLM</code> interface as <code>ollama.py</code> — <code>main.py</code> and the pipeline never know which one is active. Swap by changing <code>LLM_PROVIDER</code> in <code>.env</code>.</p>
+<pre><span class="file-tag">app/llm/openai.py</span>
+<span class="kw">from</span> openai <span class="kw">import</span> OpenAI
+<span class="kw">from</span> app.config <span class="kw">import</span> settings
+<span class="kw">from</span> app.llm.base <span class="kw">import</span> BaseLLM
+
+<span class="kw">class</span> <span class="cl">OpenAILLM</span>(BaseLLM):
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.model  = settings.OPENAI_MODEL
+
+    <span class="kw">def</span> <span class="fn">generate</span>(self, prompt: <span class="cl">str</span>) -> <span class="cl">str</span>:
+        <span class="cm">"""Non-streaming — waits for full response before returning."""</span>
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: prompt}],
+            temperature=<span class="num">0.2</span>   <span class="cm"># low temperature = more factual, less creative</span>
+        )
+        <span class="kw">return</span> response.choices[<span class="num">0</span>].message.content
+
+    <span class="kw">def</span> <span class="fn">generate_stream</span>(self, prompt: <span class="cl">str</span>):
+        <span class="cm">"""
+        Streaming — yields one token at a time.
+        Used by /ask-stream endpoint.
+        The for loop in event_stream() calls this generator.
+        """</span>
+        stream = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: prompt}],
+            temperature=<span class="num">0.2</span>,
+            stream=<span class="kw">True</span>      <span class="cm"># tells OpenAI to stream tokens back</span>
+        )
+        <span class="kw">for</span> chunk <span class="kw">in</span> stream:
+            token = chunk.choices[<span class="num">0</span>].delta.content
+            <span class="kw">if</span> token:           <span class="cm"># first and last chunks may have None content</span>
+                <span class="kw">yield</span> token</pre>
+
+  <!-- main.py startup hook -->
+  <h3>app/main.py — startup hook (addition)</h3>
+  <p>One missing piece in <code>main.py</code>: <code>init_db()</code> must be called on startup to create the SQLite tables before any request comes in. Add this block:</p>
+<pre><span class="file-tag">app/main.py — add this startup event</span>
+<span class="kw">from</span> app.db <span class="kw">import</span> init_db, get_history, get_eval_history   <span class="cm"># add init_db to import</span>
+
+@app.on_event(<span class="st">"startup"</span>)
+<span class="kw">async def</span> on_startup():
+    init_db()   <span class="cm"># creates chat_history + eval_results tables if missing</span></pre>
+
+  <div class="callout">
+    <strong>Also add <code>save_chat()</code> call to <code>/ask</code>:</strong> After building the response dict in <code>main.py</code>, add <code>save_chat(q, response["answer"], intent=response["intent"])</code> so every query is persisted for the admin history view.
+  </div>
+</section>
+
+<!-- ===== INDEX HTML ===== -->
+<section id="index-html">
+  <div class="section-label" style="color:var(--muted)">Frontend</div>
+  <h2>ui/index.html — Full Chat UI</h2>
+  <p>Complete, self-contained HTML file. No build step, no framework. Uses SSE for streaming via <code>/ask-stream</code> and shows the full RAG trace — intent badge, retrieved chunks with scores, RAGAS evaluation badges, and an expandable prompt viewer.</p>
+
+<pre><span class="file-tag">ui/index.html</span>
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+&lt;meta charset="UTF-8"/&gt;
+&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"/&gt;
+&lt;title&gt;RAG Chatbot&lt;/title&gt;
+&lt;style&gt;
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f0e8;
+         display: flex; height: 100vh; overflow: hidden; }
+
+  /* ---- SIDEBAR ---- */
+  .sidebar { width: 260px; background: #1a1a2e; color: #e2d8c8;
+             display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0; }
+  .sidebar h2 { font-size: 14px; font-weight: 600; padding: 0 20px 16px;
+                border-bottom: 1px solid rgba(255,255,255,.08); color: #e2d8c8; }
+  .sidebar .new-chat { margin: 16px; padding: 10px;
+                       background: rgba(200,75,49,.15); border: 1px solid rgba(200,75,49,.3);
+                       border-radius: 6px; color: #e2d8c8; font-size: 13px;
+                       cursor: pointer; text-align: center; }
+  .sidebar .new-chat:hover { background: rgba(200,75,49,.25); }
+  .history-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+  .history-item { padding: 8px 20px; font-size: 12px; color: rgba(226,216,200,.5);
+                  cursor: pointer; white-space: nowrap; overflow: hidden;
+                  text-overflow: ellipsis; }
+  .history-item:hover { background: rgba(255,255,255,.05); color: rgba(226,216,200,.9); }
+  .sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,.08);
+                    font-size: 12px; }
+  .sidebar-footer a { color: rgba(226,216,200,.4); text-decoration: none; }
+  .sidebar-footer a:hover { color: rgba(226,216,200,.8); }
+
+  /* ---- MAIN ---- */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  /* ---- MESSAGES ---- */
+  .messages { flex: 1; overflow-y: auto; padding: 32px; display: flex;
+              flex-direction: column; gap: 24px; }
+  .message { max-width: 820px; width: 100%; margin: 0 auto; }
+  .message.user { align-self: flex-end; max-width: 600px; }
+  .user-bubble { background: #1a1a2e; color: #e2d8c8; border-radius: 18px 18px 4px 18px;
+                 padding: 12px 18px; font-size: 14px; line-height: 1.6; }
+  .assistant-wrap { display: flex; flex-direction: column; gap: 10px; }
+
+  /* intent badge */
+  .intent-badge { display: flex; align-items: center; gap: 8px; }
+  .intent-pill { font-family: monospace; font-size: 11px; letter-spacing: 1px;
+                 padding: 3px 10px; border-radius: 3px; color: #fff;
+                 text-transform: uppercase; }
+  .intent-conf { font-size: 12px; color: #7a7060; }
+
+  /* answer */
+  .answer-bubble { background: white; border: 1px solid #cfc8b8; border-radius: 4px 18px 18px 18px;
+                   padding: 16px 20px; font-size: 14px; line-height: 1.75; }
+  .answer-bubble p { margin-bottom: 10px; }
+  .answer-bubble p:last-child { margin-bottom: 0; }
+
+  /* sources */
+  .sources { display: flex; flex-direction: column; gap: 6px; }
+  .source-item { background: #ede8de; border: 1px solid #cfc8b8; border-radius: 4px;
+                 padding: 8px 12px; font-size: 12px; display: flex; gap: 10px;
+                 align-items: flex-start; }
+  .source-num { background: #1a1a2e; color: #e2d8c8; border-radius: 2px;
+                width: 20px; height: 20px; display: flex; align-items: center;
+                justify-content: center; font-size: 10px; flex-shrink: 0; }
+  .source-meta { color: #7a7060; font-size: 11px; margin-bottom: 3px; }
+  .source-text { color: #3a3525; line-height: 1.5; }
+  .score-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+
+  /* eval scores */
+  .eval-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .eval-badge { font-size: 11px; font-family: monospace; padding: 3px 10px;
+                border-radius: 3px; border: 1px solid; }
+
+  /* prompt viewer */
+  .prompt-viewer { border: 1px solid #cfc8b8; border-radius: 4px; overflow: hidden; }
+  .prompt-toggle { background: #ede8de; border: none; width: 100%; text-align: left;
+                   padding: 8px 12px; font-size: 12px; color: #7a7060; cursor: pointer;
+                   font-family: monospace; }
+  .prompt-toggle:hover { background: #e0dace; }
+  .prompt-content { display: none; padding: 12px; background: #1a1a2e; color: #c3e88d;
+                    font-family: monospace; font-size: 11px; white-space: pre-wrap;
+                    line-height: 1.6; max-height: 300px; overflow-y: auto; }
+  .prompt-content.open { display: block; }
+
+  /* loading */
+  .loading { display: flex; gap: 4px; align-items: center; padding: 12px 0; }
+  .loading span { width: 8px; height: 8px; background: #c84b31; border-radius: 50%;
+                  animation: bounce 1s infinite; }
+  .loading span:nth-child(2) { animation-delay: .15s; }
+  .loading span:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+
+  /* ---- INPUT ---- */
+  .input-area { border-top: 1px solid #cfc8b8; padding: 20px 32px; background: #f5f0e8; }
+  .input-row { max-width: 820px; margin: 0 auto; display: flex; gap: 10px; }
+  textarea { flex: 1; border: 1px solid #cfc8b8; border-radius: 8px; padding: 12px 16px;
+             font-family: inherit; font-size: 14px; resize: none; background: white;
+             outline: none; min-height: 48px; max-height: 200px; line-height: 1.5; }
+  textarea:focus { border-color: #1a1a2e; }
+  .send-btn { background: #1a1a2e; color: #e2d8c8; border: none; border-radius: 8px;
+              width: 48px; height: 48px; cursor: pointer; font-size: 18px;
+              display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .send-btn:hover { background: #c84b31; }
+  .input-hint { max-width: 820px; margin: 8px auto 0; font-size: 11px; color: #7a7060;
+                font-family: monospace; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+
+&lt;div class="sidebar"&gt;
+  &lt;h2&gt;RAG Chatbot&lt;/h2&gt;
+  &lt;button class="new-chat" onclick="newChat()"&gt;+ New Chat&lt;/button&gt;
+  &lt;div class="history-list" id="historyList"&gt;&lt;/div&gt;
+  &lt;div class="sidebar-footer"&gt;
+    &lt;a href="/ui/admin.html"&gt;⚙ Admin Panel&lt;/a&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;div class="main"&gt;
+  &lt;div class="messages" id="messages"&gt;
+    &lt;div class="message" style="text-align:center; color:#7a7060; font-size:13px; margin-top:40px;"&gt;
+      Upload a document via &lt;code&gt;POST /upload&lt;/code&gt;, then ask anything about it.
+    &lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;div class="input-area"&gt;
+    &lt;div class="input-row"&gt;
+      &lt;textarea id="input" placeholder="Ask something about your documents…"
+                rows="1" onkeydown="handleKey(event)"&gt;&lt;/textarea&gt;
+      &lt;button class="send-btn" onclick="send()"&gt;↑&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;div class="input-hint"&gt;Enter to send · Shift+Enter for new line · uses /ask-stream&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;script&gt;
+const INTENT_COLORS = {
+  RAG_QUERY: '#2e4057', CHITCHAT: '#2e86ab',
+  GENERAL_KNOWLEDGE: '#e8a838', OUT_OF_SCOPE: '#c84b31'
+};
+
+const scoreColor = s =&gt; s &gt; 0.7 ? '#2d6a4f' : s &gt; 0.5 ? '#e8a838' : '#c84b31';
+const evalClass  = s =&gt; s &gt; 0.7 ? 'good' : s &gt; 0.5 ? 'ok' : 'bad';
+
+function handleKey(e) {
+  if (e.key === 'Enter' &amp;&amp; !e.shiftKey) { e.preventDefault(); send(); }
+}
+
+// Auto-resize textarea as user types
+document.getElementById('input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+});
+
+function addMessage(role, content) {
+  const wrap = document.getElementById('messages');
+  const div  = document.createElement('div');
+  div.className = 'message ' + role;
+  div.innerHTML = content;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return div;
+}
+
+function showLoading() {
+  return addMessage('assistant', `
+    &lt;div class="assistant-wrap"&gt;
+      &lt;div class="loading"&gt;
+        &lt;span&gt;&lt;/span&gt;&lt;span&gt;&lt;/span&gt;&lt;span&gt;&lt;/span&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;`);
+}
+
+async function send() {
+  const input = document.getElementById('input');
+  const q = input.value.trim();
+  if (!q) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+
+  // Show user message
+  addMessage('user', `&lt;div class="user-bubble"&gt;${escHtml(q)}&lt;/div&gt;`);
+  const loadingEl = showLoading();
+
+  // Use /ask (non-streaming) to get full trace including chunks + eval
+  try {
+    const res  = await fetch('/ask?q=' + encodeURIComponent(q));
+    const data = await res.json();
+    loadingEl.remove();
+    renderResponse(data);
+    loadHistory();
+  } catch(e) {
+    loadingEl.remove();
+    addMessage('assistant',
+      '&lt;div class="answer-bubble"&gt;Error connecting to the API.&lt;/div&gt;');
+  }
+}
+
+function renderResponse(data) {
+  const intentColor = INTENT_COLORS[data.intent] || '#7a7060';
+  const confPct     = Math.round((data.confidence || 0) * 100);
+
+  // Sources HTML (only for RAG_QUERY)
+  let sourcesHtml = '';
+  if (data.intent === 'RAG_QUERY' &amp;&amp; data.chunks &amp;&amp; data.chunks.length) {
+    const items = data.chunks.map((c, i) =&gt; `
+      &lt;div class="source-item"&gt;
+        &lt;div class="score-dot"
+             style="background:${scoreColor(c.rerank_score)}"&gt;&lt;/div&gt;
+        &lt;div&gt;
+          &lt;div class="source-meta"&gt;${escHtml(c.source)} · p.${c.page}
+            · rerank: ${c.rerank_score}&lt;/div&gt;
+          &lt;div class="source-text"&gt;${escHtml(c.text.substring(0, 280))}…&lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;`).join('');
+    sourcesHtml = `&lt;div class="sources"&gt;${items}&lt;/div&gt;`;
+  }
+
+  // RAGAS eval HTML
+  let evalHtml = '';
+  if (data.eval &amp;&amp; data.eval.faithfulness !== undefined) {
+    const e = data.eval;
+    evalHtml = `
+      &lt;div class="eval-row"&gt;
+        ${evalBadge('Faithfulness', e.faithfulness)}
+        ${evalBadge('Relevancy', e.answer_relevancy)}
+        ${evalBadge('Context Precision', e.context_precision)}
+      &lt;/div&gt;`;
+  }
+
+  // Prompt viewer
+  const promptHtml = data.generation?.prompt ? `
+    &lt;div class="prompt-viewer"&gt;
+      &lt;button class="prompt-toggle"
+              onclick="this.nextElementSibling.classList.toggle('open')"&gt;
+        🔍 View full prompt sent to LLM
+      &lt;/button&gt;
+      &lt;div class="prompt-content"&gt;${escHtml(data.generation.prompt)}&lt;/div&gt;
+    &lt;/div&gt;` : '';
+
+  addMessage('assistant', `
+    &lt;div class="assistant-wrap"&gt;
+      &lt;div class="intent-badge"&gt;
+        &lt;span class="intent-pill"
+              style="background:${intentColor}"&gt;${data.intent}&lt;/span&gt;
+        &lt;span class="intent-conf"&gt;${confPct}% confidence&lt;/span&gt;
+        ${data.cached ? '&lt;span class="intent-conf"&gt;· cached&lt;/span&gt;' : ''}
+      &lt;/div&gt;
+      &lt;div class="answer-bubble"&gt;${formatAnswer(data.answer)}&lt;/div&gt;
+      ${sourcesHtml}
+      ${evalHtml}
+      ${promptHtml}
+    &lt;/div&gt;`);
+}
+
+function evalBadge(label, score) {
+  const color = scoreColor(score);
+  return `&lt;span class="eval-badge"
+     style="color:${color}; border-color:${color}; background:${color}18"&gt;
+    ${label}: ${score}
+  &lt;/span&gt;`;
+}
+
+// Format plain text answer: wrap paragraphs in &lt;p&gt; tags
+function formatAnswer(text) {
+  if (!text) return '';
+  return text.split(/\n\n+/).map(p =&gt;
+    `&lt;p&gt;${escHtml(p.trim())}&lt;/p&gt;`).join('');
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&amp;/g,'&amp;amp;').replace(/&lt;/g,'&amp;lt;')
+    .replace(/&gt;/g,'&amp;gt;').replace(/"/g,'&amp;quot;');
+}
+
+async function loadHistory() {
+  try {
+    const res  = await fetch('/admin/history');
+    const data = await res.json();
+    const list = document.getElementById('historyList');
+    list.innerHTML = data.slice(0, 20).map(h =&gt; `
+      &lt;div class="history-item" title="${escHtml(h.question)}"&gt;
+        ${escHtml(h.question.substring(0, 40))}
+      &lt;/div&gt;`).join('');
+  } catch(e) {}
+}
+
+function newChat() {
+  document.getElementById('messages').innerHTML = `
+    &lt;div class="message" style="text-align:center; color:#7a7060;
+         font-size:13px; margin-top:40px;"&gt;
+      New chat started.
+    &lt;/div&gt;`;
+}
+
+// Load history on page open
+loadHistory();
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+</section>
+
+<!-- ===== ADMIN HTML ===== -->
+<section id="admin-html">
+  <div class="section-label" style="color:var(--muted)">Admin Dashboard</div>
+  <h2>ui/admin.html — Full Admin Panel</h2>
+  <p>The learning control centre. Four panels in one page: live parameter tuning, phase latency trace viewer, RAGAS score history chart, and chat history log. Everything the guide describes is fully wired here.</p>
+
+<pre><span class="file-tag">ui/admin.html</span>
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+&lt;meta charset="UTF-8"/&gt;
+&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"/&gt;
+&lt;title&gt;RAG Admin&lt;/title&gt;
+&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"&gt;&lt;/script&gt;
+&lt;style&gt;
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f0e8;
+         color: #1a1a2e; font-size: 14px; }
+
+  /* ---- TOP BAR ---- */
+  .topbar { background: #1a1a2e; color: #e2d8c8; padding: 14px 32px;
+            display: flex; align-items: center; justify-content: space-between; }
+  .topbar h1 { font-size: 16px; font-weight: 600; }
+  .topbar a  { color: rgba(226,216,200,.5); text-decoration: none; font-size: 13px; }
+  .topbar a:hover { color: rgba(226,216,200,.9); }
+
+  /* ---- GRID ---- */
+  .page { padding: 28px 32px; display: grid;
+          grid-template-columns: 340px 1fr; gap: 24px; }
+  .col-left  { display: flex; flex-direction: column; gap: 24px; }
+  .col-right { display: flex; flex-direction: column; gap: 24px; }
+
+  /* ---- PANELS ---- */
+  .panel { background: white; border: 1px solid #cfc8b8; border-radius: 6px; overflow: hidden; }
+  .panel-head { background: #1a1a2e; color: #e2d8c8; padding: 12px 16px;
+                font-family: monospace; font-size: 12px; letter-spacing: 1px;
+                text-transform: uppercase; display: flex;
+                justify-content: space-between; align-items: center; }
+  .panel-body { padding: 20px; }
+
+  /* ---- CONFIG FORM ---- */
+  .config-field { margin-bottom: 16px; }
+  .config-field label { display: block; font-size: 12px; font-family: monospace;
+                        color: #7a7060; margin-bottom: 5px; letter-spacing: .5px; }
+  .config-field input[type=range] { width: 100%; accent-color: #c84b31; }
+  .config-field input[type=number],
+  .config-field select { width: 100%; border: 1px solid #cfc8b8; border-radius: 4px;
+                         padding: 6px 10px; font-size: 13px; font-family: monospace; }
+  .range-row { display: flex; align-items: center; gap: 10px; }
+  .range-val { font-family: monospace; font-size: 13px; color: #c84b31;
+               min-width: 40px; text-align: right; }
+  .save-btn { width: 100%; background: #1a1a2e; color: #e2d8c8; border: none;
+              border-radius: 4px; padding: 10px; cursor: pointer;
+              font-family: monospace; font-size: 13px; margin-top: 4px; }
+  .save-btn:hover { background: #c84b31; }
+  .save-status { font-size: 12px; color: #2d6a4f; margin-top: 8px;
+                 font-family: monospace; text-align: center; }
+
+  /* ---- TRACES ---- */
+  .trace-list { display: flex; flex-direction: column; gap: 6px;
+                max-height: 320px; overflow-y: auto; }
+  .trace-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+               border: 1px solid #ede8de; border-radius: 4px; font-size: 12px; }
+  .trace-phase { font-family: monospace; font-weight: 600; min-width: 110px; }
+  .trace-ms { font-family: monospace; color: #7a7060; min-width: 60px; text-align: right; }
+  .trace-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .trace-params { color: #7a7060; font-size: 11px; flex: 1;
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .refresh-btn { background: none; border: 1px solid rgba(226,216,200,.3);
+                 color: rgba(226,216,200,.6); border-radius: 3px; padding: 2px 8px;
+                 font-size: 11px; cursor: pointer; font-family: monospace; }
+  .refresh-btn:hover { border-color: rgba(226,216,200,.8); color: rgba(226,216,200,.9); }
+
+  /* ---- CHART ---- */
+  .chart-wrap { position: relative; height: 280px; }
+
+  /* ---- HISTORY ---- */
+  .history-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .history-table th { background: #ede8de; padding: 8px 12px; text-align: left;
+                      font-family: monospace; font-size: 11px; letter-spacing: .5px;
+                      color: #7a7060; border-bottom: 2px solid #cfc8b8; }
+  .history-table td { padding: 8px 12px; border-bottom: 1px solid #ede8de;
+                      max-width: 300px; overflow: hidden; text-overflow: ellipsis;
+                      white-space: nowrap; }
+  .history-table tr:hover td { background: #faf7f2; }
+  .intent-pill { font-family: monospace; font-size: 10px; padding: 2px 6px;
+                 border-radius: 2px; color: white; }
+
+  @media(max-width: 900px) {
+    .page { grid-template-columns: 1fr; }
+  }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+
+&lt;div class="topbar"&gt;
+  &lt;h1&gt;⚙ RAG Admin Panel&lt;/h1&gt;
+  &lt;a href="/ui/index.html"&gt;← Back to Chat&lt;/a&gt;
+&lt;/div&gt;
+
+&lt;div class="page"&gt;
+
+  &lt;!-- ---- LEFT COLUMN ---- --&gt;
+  &lt;div class="col-left"&gt;
+
+    &lt;!-- CONFIG PANEL --&gt;
+    &lt;div class="panel"&gt;
+      &lt;div class="panel-head"&gt;
+        Pipeline Parameters
+        &lt;span style="font-size:10px; opacity:.5"&gt;hot-reload on save&lt;/span&gt;
+      &lt;/div&gt;
+      &lt;div class="panel-body"&gt;
+
+        &lt;div class="config-field"&gt;
+          &lt;label&gt;CHUNK_SIZE (tokens)&lt;/label&gt;
+          &lt;div class="range-row"&gt;
+            &lt;input type="range" id="chunk_size" min="64" max="2048" step="64"
+                   value="512" oninput="syncVal(this,'chunk_size_val')"&gt;
+            &lt;span class="range-val" id="chunk_size_val"&gt;512&lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div class="config-field"&gt;
+          &lt;label&gt;CHUNK_OVERLAP (tokens)&lt;/label&gt;
+          &lt;div class="range-row"&gt;
+            &lt;input type="range" id="chunk_overlap" min="0" max="256" step="16"
+                   value="64" oninput="syncVal(this,'chunk_overlap_val')"&gt;
+            &lt;span class="range-val" id="chunk_overlap_val"&gt;64&lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div class="config-field"&gt;
+          &lt;label&gt;TOP_K (candidates before reranking)&lt;/label&gt;
+          &lt;div class="range-row"&gt;
+            &lt;input type="range" id="top_k" min="1" max="30" step="1"
+                   value="10" oninput="syncVal(this,'top_k_val')"&gt;
+            &lt;span class="range-val" id="top_k_val"&gt;10&lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div class="config-field"&gt;
+          &lt;label&gt;TOP_N (final chunks to generator)&lt;/label&gt;
+          &lt;div class="range-row"&gt;
+            &lt;input type="range" id="top_n" min="1" max="10" step="1"
+                   value="3" oninput="syncVal(this,'top_n_val')"&gt;
+            &lt;span class="range-val" id="top_n_val"&gt;3&lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div class="config-field"&gt;
+          &lt;label&gt;HYBRID_ALPHA (0 = BM25 only · 1 = vector only)&lt;/label&gt;
+          &lt;div class="range-row"&gt;
+            &lt;input type="range" id="hybrid_alpha" min="0" max="1" step="0.05"
+                   value="0.5" oninput="syncVal(this,'hybrid_alpha_val')"&gt;
+            &lt;span class="range-val" id="hybrid_alpha_val"&gt;0.5&lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div class="config-field"&gt;
+          &lt;label&gt;EVAL_ENABLED (disable to skip RAGAS during dev)&lt;/label&gt;
+          &lt;select id="eval_enabled"&gt;
+            &lt;option value="true"&gt;true&lt;/option&gt;
+            &lt;option value="false"&gt;false&lt;/option&gt;
+          &lt;/select&gt;
+        &lt;/div&gt;
+
+        &lt;button class="save-btn" onclick="saveConfig()"&gt;SAVE &amp; APPLY&lt;/button&gt;
+        &lt;div class="save-status" id="saveStatus"&gt;&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;!-- TRACE PANEL --&gt;
+    &lt;div class="panel"&gt;
+      &lt;div class="panel-head"&gt;
+        Phase Traces (last 50)
+        &lt;button class="refresh-btn" onclick="loadTraces()"&gt;↻ refresh&lt;/button&gt;
+      &lt;/div&gt;
+      &lt;div class="panel-body"&gt;
+        &lt;div class="trace-list" id="traceList"&gt;
+          &lt;p style="color:#7a7060; font-size:12px"&gt;No traces yet — ask a question.&lt;/p&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+  &lt;/div&gt;&lt;!-- end col-left --&gt;
+
+  &lt;!-- ---- RIGHT COLUMN ---- --&gt;
+  &lt;div class="col-right"&gt;
+
+    &lt;!-- EVAL CHART --&gt;
+    &lt;div class="panel"&gt;
+      &lt;div class="panel-head"&gt;RAGAS Score History&lt;/div&gt;
+      &lt;div class="panel-body"&gt;
+        &lt;div class="chart-wrap"&gt;
+          &lt;canvas id="evalChart"&gt;&lt;/canvas&gt;
+        &lt;/div&gt;
+        &lt;p style="font-size:11px; color:#7a7060; margin-top:10px; font-family:monospace"&gt;
+          Each point = one query. Watch scores change as you tune parameters above.
+        &lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;!-- HISTORY TABLE --&gt;
+    &lt;div class="panel"&gt;
+      &lt;div class="panel-head"&gt;
+        Chat History
+        &lt;button class="refresh-btn" onclick="loadHistory()"&gt;↻ refresh&lt;/button&gt;
+      &lt;/div&gt;
+      &lt;div class="panel-body" style="padding:0; overflow-x:auto"&gt;
+        &lt;table class="history-table"&gt;
+          &lt;thead&gt;
+            &lt;tr&gt;
+              &lt;th&gt;#&lt;/th&gt;
+              &lt;th&gt;Question&lt;/th&gt;
+              &lt;th&gt;Intent&lt;/th&gt;
+              &lt;th&gt;Answer (preview)&lt;/th&gt;
+              &lt;th&gt;Time&lt;/th&gt;
+            &lt;/tr&gt;
+          &lt;/thead&gt;
+          &lt;tbody id="historyBody"&gt;
+            &lt;tr&gt;&lt;td colspan="5" style="text-align:center; color:#7a7060; padding:16px"&gt;
+              No history yet.&lt;/td&gt;&lt;/tr&gt;
+          &lt;/tbody&gt;
+        &lt;/table&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+  &lt;/div&gt;&lt;!-- end col-right --&gt;
+&lt;/div&gt;&lt;!-- end page --&gt;
+
+&lt;script&gt;
+const INTENT_COLORS = {
+  RAG_QUERY:'#2e4057', CHITCHAT:'#2e86ab',
+  GENERAL_KNOWLEDGE:'#e8a838', OUT_OF_SCOPE:'#c84b31'
+};
+const PHASE_COLORS = {
+  classification:'#2e4057', ingestion:'#c84b31', embedding:'#e8a838',
+  retrieval:'#2e86ab', generation:'#2d6a4f', evaluation:'#7b5ea7'
+};
+
+function syncVal(el, valId) {
+  document.getElementById(valId).textContent = el.value;
+}
+
+// ---- LOAD CURRENT CONFIG ----
+async function loadConfig() {
+  const res  = await fetch('/admin/config');
+  const cfg  = await res.json();
+  const map = {
+    chunk_size: ['chunk_size','chunk_size_val'],
+    chunk_overlap: ['chunk_overlap','chunk_overlap_val'],
+    top_k: ['top_k','top_k_val'],
+    top_n: ['top_n','top_n_val'],
+    hybrid_alpha: ['hybrid_alpha','hybrid_alpha_val'],
+  };
+  for (const [key, [inputId, valId]] of Object.entries(map)) {
+    const val = cfg[key.toUpperCase()];
+    if (val !== undefined) {
+      document.getElementById(inputId).value = val;
+      document.getElementById(valId).textContent = val;
+    }
+  }
+  if (cfg.EVAL_ENABLED !== undefined)
+    document.getElementById('eval_enabled').value = cfg.EVAL_ENABLED.toString();
+}
+
+// ---- SAVE CONFIG ----
+async function saveConfig() {
+  const payload = {
+    chunk_size:    parseInt(document.getElementById('chunk_size').value),
+    chunk_overlap: parseInt(document.getElementById('chunk_overlap').value),
+    top_k:         parseInt(document.getElementById('top_k').value),
+    top_n:         parseInt(document.getElementById('top_n').value),
+    hybrid_alpha:  parseFloat(document.getElementById('hybrid_alpha').value),
+    eval_enabled:  document.getElementById('eval_enabled').value === 'true',
+  };
+  await fetch('/admin/config', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const st = document.getElementById('saveStatus');
+  st.textContent = '✓ Applied — re-upload documents if you changed chunk size';
+  setTimeout(() =&gt; st.textContent = '', 5000);
+}
+
+// ---- LOAD TRACES ----
+async function loadTraces() {
+  const res    = await fetch('/admin/traces');
+  const traces = await res.json();
+  const list   = document.getElementById('traceList');
+  if (!traces.length) {
+    list.innerHTML = '&lt;p style="color:#7a7060;font-size:12px"&gt;No traces yet.&lt;/p&gt;';
+    return;
+  }
+  list.innerHTML = [...traces].reverse().map(t =&gt; {
+    const color  = PHASE_COLORS[t.phase] || '#7a7060';
+    const status = t.status === 'ok' ? '#2d6a4f' : '#c84b31';
+    const params = Object.entries(t.params || {})
+      .map(([k,v]) =&gt; `${k}:${v}`).join(' · ');
+    return `
+      &lt;div class="trace-row"&gt;
+        &lt;div class="trace-status" style="background:${status}"&gt;&lt;/div&gt;
+        &lt;div class="trace-phase" style="color:${color}"&gt;${t.phase}&lt;/div&gt;
+        &lt;div class="trace-ms"&gt;${t.duration_ms}ms&lt;/div&gt;
+        &lt;div class="trace-params"&gt;${params}&lt;/div&gt;
+      &lt;/div&gt;`;
+  }).join('');
+}
+
+// ---- EVAL CHART ----
+let evalChart = null;
+async function loadEvals() {
+  const res  = await fetch('/admin/evals');
+  const data = await res.json();
+  if (!data.length) return;
+
+  const labels = data.map((_, i) =&gt; '#' + (i + 1)).reverse();
+  const faith  = data.map(d =&gt; d.faithfulness).reverse();
+  const relev  = data.map(d =&gt; d.answer_relevancy).reverse();
+  const prec   = data.map(d =&gt; d.context_precision).reverse();
+
+  const ctx = document.getElementById('evalChart').getContext('2d');
+  if (evalChart) evalChart.destroy();
+  evalChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Faithfulness',      data: faith, borderColor:'#2d6a4f',
+          backgroundColor:'#2d6a4f18', tension:.3, pointRadius:4 },
+        { label: 'Answer Relevancy',  data: relev, borderColor:'#2e86ab',
+          backgroundColor:'#2e86ab18', tension:.3, pointRadius:4 },
+        { label: 'Context Precision', data: prec,  borderColor:'#7b5ea7',
+          backgroundColor:'#7b5ea718', tension:.3, pointRadius:4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y: { min: 0, max: 1, ticks: { font: { family: 'monospace', size: 11 } } },
+        x: { ticks: { font: { family: 'monospace', size: 11 } } }
+      },
+      plugins: { legend: { labels: { font: { family: 'monospace', size: 11 } } } }
+    }
+  });
+}
+
+// ---- HISTORY TABLE ----
+async function loadHistory() {
+  const res  = await fetch('/admin/history');
+  const data = await res.json();
+  const body = document.getElementById('historyBody');
+  if (!data.length) return;
+  body.innerHTML = data.map(h =&gt; {
+    const ic = INTENT_COLORS[h.intent] || '#7a7060';
+    const dt = new Date(h.created).toLocaleTimeString();
+    return `
+      &lt;tr&gt;
+        &lt;td style="color:#7a7060"&gt;${h.id}&lt;/td&gt;
+        &lt;td&gt;${escHtml(h.question.substring(0,60))}${h.question.length&gt;60?'…':''}&lt;/td&gt;
+        &lt;td&gt;&lt;span class="intent-pill"
+                   style="background:${ic}"&gt;${h.intent||'—'}&lt;/span&gt;&lt;/td&gt;
+        &lt;td style="color:#7a7060"&gt;
+          ${escHtml((h.answer||'').substring(0,80))}…
+        &lt;/td&gt;
+        &lt;td style="color:#7a7060; font-family:monospace"&gt;${dt}&lt;/td&gt;
+      &lt;/tr&gt;`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return String(s||'')
+    .replace(/&amp;/g,'&amp;amp;').replace(/&lt;/g,'&amp;lt;')
+    .replace(/&gt;/g,'&amp;gt;').replace(/"/g,'&amp;quot;');
+}
+
+// ---- INIT ----
+loadConfig();
+loadTraces();
+loadEvals();
+loadHistory();
+
+// Auto-refresh traces every 10 seconds
+setInterval(loadTraces, 10000);
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
 </section>
 
 </main>
