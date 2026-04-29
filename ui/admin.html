@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RAG Admin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f0e8;
+         color: #1a1a2e; font-size: 14px; }
+
+  /* ---- TOP BAR ---- */
+  .topbar { background: #1a1a2e; color: #e2d8c8; padding: 14px 32px;
+            display: flex; align-items: center; justify-content: space-between; }
+  .topbar h1 { font-size: 16px; font-weight: 600; }
+  .topbar a  { color: rgba(226,216,200,.5); text-decoration: none; font-size: 13px; }
+  .topbar a:hover { color: rgba(226,216,200,.9); }
+
+  /* ---- GRID ---- */
+  .page { padding: 28px 32px; display: grid;
+          grid-template-columns: 340px 1fr; gap: 24px; }
+  .col-left  { display: flex; flex-direction: column; gap: 24px; }
+  .col-right { display: flex; flex-direction: column; gap: 24px; }
+
+  /* ---- PANELS ---- */
+  .panel { background: white; border: 1px solid #cfc8b8; border-radius: 6px; overflow: hidden; }
+  .panel-head { background: #1a1a2e; color: #e2d8c8; padding: 12px 16px;
+                font-family: monospace; font-size: 12px; letter-spacing: 1px;
+                text-transform: uppercase; display: flex;
+                justify-content: space-between; align-items: center; }
+  .panel-body { padding: 20px; }
+
+  /* ---- CONFIG FORM ---- */
+  .config-field { margin-bottom: 16px; }
+  .config-field label { display: block; font-size: 12px; font-family: monospace;
+                        color: #7a7060; margin-bottom: 5px; letter-spacing: .5px; }
+  .config-field input[type=range] { width: 100%; accent-color: #c84b31; }
+  .config-field input[type=number],
+  .config-field select { width: 100%; border: 1px solid #cfc8b8; border-radius: 4px;
+                         padding: 6px 10px; font-size: 13px; font-family: monospace; }
+  .range-row { display: flex; align-items: center; gap: 10px; }
+  .range-val { font-family: monospace; font-size: 13px; color: #c84b31;
+               min-width: 40px; text-align: right; }
+  .save-btn { width: 100%; background: #1a1a2e; color: #e2d8c8; border: none;
+              border-radius: 4px; padding: 10px; cursor: pointer;
+              font-family: monospace; font-size: 13px; margin-top: 4px; }
+  .save-btn:hover { background: #c84b31; }
+  .save-status { font-size: 12px; color: #2d6a4f; margin-top: 8px;
+                 font-family: monospace; text-align: center; }
+
+  /* ---- TRACES ---- */
+  .trace-list { display: flex; flex-direction: column; gap: 6px;
+                max-height: 320px; overflow-y: auto; }
+  .trace-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+               border: 1px solid #ede8de; border-radius: 4px; font-size: 12px; }
+  .trace-phase { font-family: monospace; font-weight: 600; min-width: 110px; }
+  .trace-ms { font-family: monospace; color: #7a7060; min-width: 60px; text-align: right; }
+  .trace-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .trace-params { color: #7a7060; font-size: 11px; flex: 1;
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .refresh-btn { background: none; border: 1px solid rgba(226,216,200,.3);
+                 color: rgba(226,216,200,.6); border-radius: 3px; padding: 2px 8px;
+                 font-size: 11px; cursor: pointer; font-family: monospace; }
+  .refresh-btn:hover { border-color: rgba(226,216,200,.8); color: rgba(226,216,200,.9); }
+
+  /* ---- CHART ---- */
+  .chart-wrap { position: relative; height: 280px; }
+
+  /* ---- HISTORY ---- */
+  .history-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .history-table th { background: #ede8de; padding: 8px 12px; text-align: left;
+                      font-family: monospace; font-size: 11px; letter-spacing: .5px;
+                      color: #7a7060; border-bottom: 2px solid #cfc8b8; }
+  .history-table td { padding: 8px 12px; border-bottom: 1px solid #ede8de;
+                      max-width: 300px; overflow: hidden; text-overflow: ellipsis;
+                      white-space: nowrap; }
+  .history-table tr:hover td { background: #faf7f2; }
+  .intent-pill { font-family: monospace; font-size: 10px; padding: 2px 6px;
+                 border-radius: 2px; color: white; }
+
+  @media(max-width: 900px) {
+    .page { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>⚙ RAG Admin Panel</h1>
+  <a href="/ui/index.html">← Back to Chat</a>
+</div>
+
+<div class="page">
+
+  <!-- ---- LEFT COLUMN ---- -->
+  <div class="col-left">
+
+    <!-- CONFIG PANEL -->
+    <div class="panel">
+      <div class="panel-head">
+        Pipeline Parameters
+        <span style="font-size:10px; opacity:.5">hot-reload on save</span>
+      </div>
+      <div class="panel-body">
+
+        <div class="config-field">
+          <label>CHUNK_SIZE (tokens)</label>
+          <div class="range-row">
+            <input type="range" id="chunk_size" min="64" max="2048" step="64"
+                   value="512" oninput="syncVal(this,'chunk_size_val')">
+            <span class="range-val" id="chunk_size_val">512</span>
+          </div>
+        </div>
+
+        <div class="config-field">
+          <label>CHUNK_OVERLAP (tokens)</label>
+          <div class="range-row">
+            <input type="range" id="chunk_overlap" min="0" max="256" step="16"
+                   value="64" oninput="syncVal(this,'chunk_overlap_val')">
+            <span class="range-val" id="chunk_overlap_val">64</span>
+          </div>
+        </div>
+
+        <div class="config-field">
+          <label>TOP_K (candidates before reranking)</label>
+          <div class="range-row">
+            <input type="range" id="top_k" min="1" max="30" step="1"
+                   value="10" oninput="syncVal(this,'top_k_val')">
+            <span class="range-val" id="top_k_val">10</span>
+          </div>
+        </div>
+
+        <div class="config-field">
+          <label>TOP_N (final chunks to generator)</label>
+          <div class="range-row">
+            <input type="range" id="top_n" min="1" max="10" step="1"
+                   value="3" oninput="syncVal(this,'top_n_val')">
+            <span class="range-val" id="top_n_val">3</span>
+          </div>
+        </div>
+
+        <div class="config-field">
+          <label>HYBRID_ALPHA (0 = BM25 only · 1 = vector only)</label>
+          <div class="range-row">
+            <input type="range" id="hybrid_alpha" min="0" max="1" step="0.05"
+                   value="0.5" oninput="syncVal(this,'hybrid_alpha_val')">
+            <span class="range-val" id="hybrid_alpha_val">0.5</span>
+          </div>
+        </div>
+
+        <div class="config-field">
+          <label>EVAL_ENABLED (disable to skip RAGAS during dev)</label>
+          <select id="eval_enabled">
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </div>
+
+        <button class="save-btn" onclick="saveConfig()">SAVE & APPLY</button>
+        <div class="save-status" id="saveStatus"></div>
+      </div>
+    </div>
+
+    <!-- TRACE PANEL -->
+    <div class="panel">
+      <div class="panel-head">
+        Phase Traces (last 50)
+        <button class="refresh-btn" onclick="loadTraces()">↻ refresh</button>
+      </div>
+      <div class="panel-body">
+        <div class="trace-list" id="traceList">
+          <p style="color:#7a7060; font-size:12px">No traces yet — ask a question.</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end col-left -->
+
+  <!-- ---- RIGHT COLUMN ---- -->
+  <div class="col-right">
+
+    <!-- EVAL CHART -->
+    <div class="panel">
+      <div class="panel-head">RAGAS Score History</div>
+      <div class="panel-body">
+        <div class="chart-wrap">
+          <canvas id="evalChart"></canvas>
+        </div>
+        <p style="font-size:11px; color:#7a7060; margin-top:10px; font-family:monospace">
+          Each point = one query. Watch scores change as you tune parameters above.
+        </p>
+      </div>
+    </div>
+
+    <!-- HISTORY TABLE -->
+    <div class="panel">
+      <div class="panel-head">
+        Chat History
+        <button class="refresh-btn" onclick="loadHistory()">↻ refresh</button>
+      </div>
+      <div class="panel-body" style="padding:0; overflow-x:auto">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Question</th>
+              <th>Intent</th>
+              <th>Answer (preview)</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr><td colspan="5" style="text-align:center; color:#7a7060; padding:16px">
+              No history yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- end col-right -->
+</div><!-- end page -->
+
+<script>
+const INTENT_COLORS = {
+  RAG_QUERY:'#2e4057', CHITCHAT:'#2e86ab',
+  GENERAL_KNOWLEDGE:'#e8a838', OUT_OF_SCOPE:'#c84b31'
+};
+const PHASE_COLORS = {
+  classification:'#2e4057', ingestion:'#c84b31', embedding:'#e8a838',
+  retrieval:'#2e86ab', generation:'#2d6a4f', evaluation:'#7b5ea7'
+};
+
+function syncVal(el, valId) {
+  document.getElementById(valId).textContent = el.value;
+}
+
+// ---- LOAD CURRENT CONFIG ----
+async function loadConfig() {
+  const res  = await fetch('/admin/config');
+  const cfg  = await res.json();
+  const map = {
+    chunk_size: ['chunk_size','chunk_size_val'],
+    chunk_overlap: ['chunk_overlap','chunk_overlap_val'],
+    top_k: ['top_k','top_k_val'],
+    top_n: ['top_n','top_n_val'],
+    hybrid_alpha: ['hybrid_alpha','hybrid_alpha_val'],
+  };
+  for (const [key, [inputId, valId]] of Object.entries(map)) {
+    const val = cfg[key.toUpperCase()];
+    if (val !== undefined) {
+      document.getElementById(inputId).value = val;
+      document.getElementById(valId).textContent = val;
+    }
+  }
+  if (cfg.EVAL_ENABLED !== undefined)
+    document.getElementById('eval_enabled').value = cfg.EVAL_ENABLED.toString();
+}
+
+// ---- SAVE CONFIG ----
+async function saveConfig() {
+  const payload = {
+    chunk_size:    parseInt(document.getElementById('chunk_size').value),
+    chunk_overlap: parseInt(document.getElementById('chunk_overlap').value),
+    top_k:         parseInt(document.getElementById('top_k').value),
+    top_n:         parseInt(document.getElementById('top_n').value),
+    hybrid_alpha:  parseFloat(document.getElementById('hybrid_alpha').value),
+    eval_enabled:  document.getElementById('eval_enabled').value === 'true',
+  };
+  await fetch('/admin/config', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const st = document.getElementById('saveStatus');
+  st.textContent = '✓ Applied — re-upload documents if you changed chunk size';
+  setTimeout(() => st.textContent = '', 5000);
+}
+
+// ---- LOAD TRACES ----
+async function loadTraces() {
+  const res    = await fetch('/admin/traces');
+  const traces = await res.json();
+  const list   = document.getElementById('traceList');
+  if (!traces.length) {
+    list.innerHTML = '<p style="color:#7a7060;font-size:12px">No traces yet.</p>';
+    return;
+  }
+  list.innerHTML = [...traces].reverse().map(t => {
+    const color  = PHASE_COLORS[t.phase] || '#7a7060';
+    const status = t.status === 'ok' ? '#2d6a4f' : '#c84b31';
+    const params = Object.entries(t.params || {})
+      .map(([k,v]) => `${k}:${v}`).join(' · ');
+    return `
+      <div class="trace-row">
+        <div class="trace-status" style="background:${status}"></div>
+        <div class="trace-phase" style="color:${color}">${t.phase}</div>
+        <div class="trace-ms">${t.duration_ms}ms</div>
+        <div class="trace-params">${params}</div>
+      </div>`;
+  }).join('');
+}
+
+// ---- EVAL CHART ----
+let evalChart = null;
+async function loadEvals() {
+  const res  = await fetch('/admin/evals');
+  const data = await res.json();
+  if (!data.length) return;
+
+  const labels = data.map((_, i) => '#' + (i + 1)).reverse();
+  const faith  = data.map(d => d.faithfulness).reverse();
+  const relev  = data.map(d => d.answer_relevancy).reverse();
+  const prec   = data.map(d => d.context_precision).reverse();
+
+  const ctx = document.getElementById('evalChart').getContext('2d');
+  if (evalChart) evalChart.destroy();
+  evalChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Faithfulness',      data: faith, borderColor:'#2d6a4f',
+          backgroundColor:'#2d6a4f18', tension:.3, pointRadius:4 },
+        { label: 'Answer Relevancy',  data: relev, borderColor:'#2e86ab',
+          backgroundColor:'#2e86ab18', tension:.3, pointRadius:4 },
+        { label: 'Context Precision', data: prec,  borderColor:'#7b5ea7',
+          backgroundColor:'#7b5ea718', tension:.3, pointRadius:4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y: { min: 0, max: 1, ticks: { font: { family: 'monospace', size: 11 } } },
+        x: { ticks: { font: { family: 'monospace', size: 11 } } }
+      },
+      plugins: { legend: { labels: { font: { family: 'monospace', size: 11 } } } }
+    }
+  });
+}
+
+// ---- HISTORY TABLE ----
+async function loadHistory() {
+  const res  = await fetch('/admin/history');
+  const data = await res.json();
+  const body = document.getElementById('historyBody');
+  if (!data.length) return;
+  body.innerHTML = data.map(h => {
+    const ic = INTENT_COLORS[h.intent] || '#7a7060';
+    const dt = new Date(h.created).toLocaleTimeString();
+    return `
+      <tr>
+        <td style="color:#7a7060">${h.id}</td>
+        <td>${escHtml(h.question.substring(0,60))}${h.question.length>60?'…':''}</td>
+        <td><span class="intent-pill"
+                   style="background:${ic}">${h.intent||'—'}</span></td>
+        <td style="color:#7a7060">
+          ${escHtml((h.answer||'').substring(0,80))}…
+        </td>
+        <td style="color:#7a7060; font-family:monospace">${dt}</td>
+      </tr>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---- INIT ----
+loadConfig();
+loadTraces();
+loadEvals();
+loadHistory();
+
+// Auto-refresh traces every 10 seconds
+setInterval(loadTraces, 10000);
+</script>
+</body>
+</html>
