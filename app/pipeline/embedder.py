@@ -56,7 +56,7 @@ class Embedder:
             self.client.create_collection(
                 collection_name=COLLECTION_NAME,
                 vectors_config=VectorParams(
-                    size=EMBEDDING_DIM,
+                    size=EMBEDDING_DIM,  # 1536 for -small, 3072 for -large
                     distance=Distance.COSINE,
                 ),
             )
