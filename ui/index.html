@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>RAG Chatbot</title>
+<title>RAG 챗봇</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, sans-serif; background: #f5f0e8;
@@ -108,28 +108,28 @@
 <body>
 
 <div class="sidebar">
-  <h2>RAG Chatbot</h2>
-  <button class="new-chat" onclick="newChat()">+ New Chat</button>
+  <h2>RAG 챗봇</h2>
+  <button class="new-chat" onclick="newChat()">+ 새 채팅</button>
   <div class="history-list" id="historyList"></div>
   <div class="sidebar-footer">
-    <a href="/ui/admin.html">⚙ Admin Panel</a>
+    <a href="/ui/admin.html">⚙ 관리자 패널</a>
   </div>
 </div>
 
 <div class="main">
   <div class="messages" id="messages">
     <div class="message" style="text-align:center; color:#7a7060; font-size:13px; margin-top:40px;">
-      Upload a document via <code>POST /upload</code>, then ask anything about it.
+      <code>POST /upload</code>를 통해 문서를 업로드한 다음, 무엇이든 질문해 보세요.
     </div>
   </div>
 
   <div class="input-area">
     <div class="input-row">
-      <textarea id="input" placeholder="Ask something about your documents…"
+      <textarea id="input" placeholder="문서에 대해 질문해 보세요…"
                 rows="1" onkeydown="handleKey(event)"></textarea>
       <button class="send-btn" onclick="send()">↑</button>
     </div>
-    <div class="input-hint">Enter to send · Shift+Enter for new line · uses /ask-stream</div>
+    <div class="input-hint">Enter로 전송 · Shift+Enter로 줄바꿈 · /ask-stream 사용</div>
   </div>
 </div>
 
@@ -193,7 +193,7 @@ async function send() {
   } catch(e) {
     loadingEl.remove();
     addMessage('assistant',
-      '<div class="answer-bubble">Error connecting to the API.</div>');
+      '<div class="answer-bubble">API 연결 중 오류가 발생했습니다.</div>');
   }
 }
 
@@ -209,8 +209,8 @@ function renderResponse(data) {
         <div class="score-dot"
              style="background:${scoreColor(c.rerank_score)}"></div>
         <div>
-          <div class="source-meta">${escHtml(c.source)} · p.${c.page}
-            · rerank: ${c.rerank_score}</div>
+          <div class="source-meta">${escHtml(c.source)} · 페이지 ${c.page}
+            · 재랭킹: ${c.rerank_score}</div>
           <div class="source-text">${escHtml(c.text.substring(0, 280))}…</div>
         </div>
       </div>`).join('');
@@ -223,9 +223,9 @@ function renderResponse(data) {
     const e = data.eval;
     evalHtml = `
       <div class="eval-row">
-        ${evalBadge('Faithfulness', e.faithfulness)}
-        ${evalBadge('Relevancy', e.answer_relevancy)}
-        ${evalBadge('Context Precision', e.context_precision)}
+        ${evalBadge('신뢰성', e.faithfulness)}
+        ${evalBadge('관련성', e.answer_relevancy)}
+        ${evalBadge('문맥 정확성', e.context_precision)}
       </div>`;
   }
 
@@ -234,7 +234,7 @@ function renderResponse(data) {
     <div class="prompt-viewer">
       <button class="prompt-toggle"
               onclick="this.nextElementSibling.classList.toggle('open')">
-        🔍 View full prompt sent to LLM
+        🔍 LLM에 전송된 전체 프롬프트 보기
       </button>
       <div class="prompt-content">${escHtml(data.generation.prompt)}</div>
     </div>` : '';
@@ -244,8 +244,8 @@ function renderResponse(data) {
       <div class="intent-badge">
         <span class="intent-pill"
               style="background:${intentColor}">${data.intent}</span>
-        <span class="intent-conf">${confPct}% confidence</span>
-        ${data.cached ? '<span class="intent-conf">· cached</span>' : ''}
+        <span class="intent-conf">${confPct}% 신뢰도</span>
+        ${data.cached ? '<span class="intent-conf">· 캐시됨</span>' : ''}
       </div>
       <div class="answer-bubble">${formatAnswer(data.answer)}</div>
       ${sourcesHtml}
@@ -265,7 +265,7 @@ function evalBadge(label, score) {
 // Format plain text answer: wrap paragraphs in <p> tags
 function formatAnswer(text) {
   if (!text) return '';
-  return text.split(/\n\n+/).map(p =>
+  return text.split(/\\n\\n+/).map(p =>
     `<p>${escHtml(p.trim())}</p>`).join('');
 }
 
@@ -291,7 +291,7 @@ function newChat() {
   document.getElementById('messages').innerHTML = `
     <div class="message" style="text-align:center; color:#7a7060;
          font-size:13px; margin-top:40px;">
-      New chat started.
+      새 채팅이 시작되었습니다.
     </div>`;
 }
 

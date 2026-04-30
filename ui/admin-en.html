@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>RAG 관리자</title>
+<title>RAG Admin</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -87,8 +87,8 @@
 <body>
 
 <div class="topbar">
-  <h1>⚙ RAG 관리자 패널</h1>
-  <a href="/ui/index.html">← 채팅으로 돌아가기</a>
+  <h1>⚙ RAG Admin Panel</h1>
+  <a href="/ui/index.html">← Back to Chat</a>
 </div>
 
 <div class="page">
@@ -99,13 +99,13 @@
     <!-- CONFIG PANEL -->
     <div class="panel">
       <div class="panel-head">
-        파이프라인 매개변수
-        <span style="font-size:10px; opacity:.5">저장 시 핫 리로드</span>
+        Pipeline Parameters
+        <span style="font-size:10px; opacity:.5">hot-reload on save</span>
       </div>
       <div class="panel-body">
 
         <div class="config-field">
-          <label>청크 크기 (토큰)</label>
+          <label>CHUNK_SIZE (tokens)</label>
           <div class="range-row">
             <input type="range" id="chunk_size" min="64" max="2048" step="64"
                    value="512" oninput="syncVal(this,'chunk_size_val')">
@@ -114,7 +114,7 @@
         </div>
 
         <div class="config-field">
-          <label>청크 중복 (토큰)</label>
+          <label>CHUNK_OVERLAP (tokens)</label>
           <div class="range-row">
             <input type="range" id="chunk_overlap" min="0" max="256" step="16"
                    value="64" oninput="syncVal(this,'chunk_overlap_val')">
@@ -123,7 +123,7 @@
         </div>
 
         <div class="config-field">
-          <label>TOP_K (재랭킹 전 후보)</label>
+          <label>TOP_K (candidates before reranking)</label>
           <div class="range-row">
             <input type="range" id="top_k" min="1" max="30" step="1"
                    value="10" oninput="syncVal(this,'top_k_val')">
@@ -132,7 +132,7 @@
         </div>
 
         <div class="config-field">
-          <label>TOP_N (생성기에 전달될 최종 청크)</label>
+          <label>TOP_N (final chunks to generator)</label>
           <div class="range-row">
             <input type="range" id="top_n" min="1" max="10" step="1"
                    value="3" oninput="syncVal(this,'top_n_val')">
@@ -141,7 +141,7 @@
         </div>
 
         <div class="config-field">
-          <label>HYBRID_ALPHA (0 = BM25 전용 · 1 = 벡터 전용)</label>
+          <label>HYBRID_ALPHA (0 = BM25 only · 1 = vector only)</label>
           <div class="range-row">
             <input type="range" id="hybrid_alpha" min="0" max="1" step="0.05"
                    value="0.5" oninput="syncVal(this,'hybrid_alpha_val')">
@@ -150,14 +150,14 @@
         </div>
 
         <div class="config-field">
-          <label>평가 활성화 (개발 중 RAGAS를 건너뛰려면 비활성화)</label>
+          <label>EVAL_ENABLED (disable to skip RAGAS during dev)</label>
           <select id="eval_enabled">
             <option value="true">true</option>
             <option value="false">false</option>
           </select>
         </div>
 
-        <button class="save-btn" onclick="saveConfig()">저장 및 적용</button>
+        <button class="save-btn" onclick="saveConfig()">SAVE & APPLY</button>
         <div class="save-status" id="saveStatus"></div>
       </div>
     </div>
@@ -165,12 +165,12 @@
     <!-- TRACE PANEL -->
     <div class="panel">
       <div class="panel-head">
-        단계별 추적 (최근 50개)
-        <button class="refresh-btn" onclick="loadTraces()">↻ 새로고침</button>
+        Phase Traces (last 50)
+        <button class="refresh-btn" onclick="loadTraces()">↻ refresh</button>
       </div>
       <div class="panel-body">
         <div class="trace-list" id="traceList">
-          <p style="color:#7a7060; font-size:12px">아직 추적 기록이 없습니다 — 질문을 해보세요.</p>
+          <p style="color:#7a7060; font-size:12px">No traces yet — ask a question.</p>
         </div>
       </div>
     </div>
@@ -182,13 +182,13 @@
 
     <!-- EVAL CHART -->
     <div class="panel">
-      <div class="panel-head">RAGAS 점수 기록</div>
+      <div class="panel-head">RAGAS Score History</div>
       <div class="panel-body">
         <div class="chart-wrap">
           <canvas id="evalChart"></canvas>
         </div>
         <p style="font-size:11px; color:#7a7060; margin-top:10px; font-family:monospace">
-          각 점은 하나의 쿼리를 의미합니다. 위 매개변수를 조정하면서 점수 변화를 확인하세요.
+          Each point = one query. Watch scores change as you tune parameters above.
         </p>
       </div>
     </div>
@@ -196,23 +196,23 @@
     <!-- HISTORY TABLE -->
     <div class="panel">
       <div class="panel-head">
-        채팅 기록
-        <button class="refresh-btn" onclick="loadHistory()">↻ 새로고침</button>
+        Chat History
+        <button class="refresh-btn" onclick="loadHistory()">↻ refresh</button>
       </div>
       <div class="panel-body" style="padding:0; overflow-x:auto">
         <table class="history-table">
           <thead>
             <tr>
               <th>#</th>
-              <th>질문</th>
-              <th>의도</th>
-              <th>답변 (미리보기)</th>
-              <th>시간</th>
+              <th>Question</th>
+              <th>Intent</th>
+              <th>Answer (preview)</th>
+              <th>Time</th>
             </tr>
           </thead>
           <tbody id="historyBody">
             <tr><td colspan="5" style="text-align:center; color:#7a7060; padding:16px">
-              아직 기록이 없습니다.</td></tr>
+              No history yet.</td></tr>
           </tbody>
         </table>
       </div>
@@ -273,7 +273,7 @@ async function saveConfig() {
     body: JSON.stringify(payload)
   });
   const st = document.getElementById('saveStatus');
-  st.textContent = '✓ 적용됨 — 청크 크기를 변경한 경우 문서를 다시 업로드하세요';
+  st.textContent = '✓ Applied — re-upload documents if you changed chunk size';
   setTimeout(() => st.textContent = '', 5000);
 }
 
@@ -283,7 +283,7 @@ async function loadTraces() {
   const traces = await res.json();
   const list   = document.getElementById('traceList');
   if (!traces.length) {
-    list.innerHTML = '<p style="color:#7a7060;font-size:12px">아직 추적 기록이 없습니다.</p>';
+    list.innerHTML = '<p style="color:#7a7060;font-size:12px">No traces yet.</p>';
     return;
   }
   list.innerHTML = [...traces].reverse().map(t => {
@@ -320,11 +320,11 @@ async function loadEvals() {
     data: {
       labels,
       datasets: [
-        { label: '신뢰성',      data: faith, borderColor:'#2d6a4f',
+        { label: 'Faithfulness',      data: faith, borderColor:'#2d6a4f',
           backgroundColor:'#2d6a4f18', tension:.3, pointRadius:4 },
-        { label: '답변 관련성',  data: relev, borderColor:'#2e86ab',
+        { label: 'Answer Relevancy',  data: relev, borderColor:'#2e86ab',
           backgroundColor:'#2e86ab18', tension:.3, pointRadius:4 },
-        { label: '문맥 정확성', data: prec,  borderColor:'#7b5ea7',
+        { label: 'Context Precision', data: prec,  borderColor:'#7b5ea7',
           backgroundColor:'#7b5ea718', tension:.3, pointRadius:4 },
       ]
     },
