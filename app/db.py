@@ -68,7 +68,7 @@ def save_eval_result(question: str, answer: str, scores: dict):
 def get_history(limit: int = 50) -> list[dict]:
     conn = _connect()
     rows = conn.execute(
-        "SELECT * FROM chat_history ORDER BY created DESC LIMIT ?", (limit,)
+        "SELECT * FROM chat_history ORDER BY id DESC LIMIT ?", (limit,)
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
@@ -77,7 +77,7 @@ def get_history(limit: int = 50) -> list[dict]:
 def get_eval_history(limit: int = 100) -> list[dict]:
     conn = _connect()
     rows = conn.execute(
-        "SELECT * FROM eval_results ORDER BY created DESC LIMIT ?", (limit,)
+        "SELECT * FROM eval_results ORDER BY id DESC LIMIT ?", (limit,)
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
