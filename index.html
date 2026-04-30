@@ -617,42 +617,49 @@ tr:hover td { background: var(--paper2); }
   <h2>Project Structure</h2>
 
   <div class="tree"><span class="d">/opt/rag-learn/</span>
-<span class="c">├── docker-compose.yml        # Only 3 services: API, Qdrant, Redis</span>
-<span class="c">├── .env                      # Environment config</span>
-<span class="c">├── Dockerfile</span>
+<span class="c">├── docker-compose.yml        # 3 services: API, Qdrant, Redis — with healthchecks</span>
+<span class="c">├── .env                      # Environment config (git-ignored)</span>
+<span class="c">├── .env.example              # Safe template to commit to git</span>
+<span class="c">├── .gitignore                # Excludes .env, __pycache__, *.db, uploads</span>
+<span class="c">├── Dockerfile                # python:3.11-slim + system deps</span>
 <span class="c">├── requirements.txt</span>
+<span class="c">├── README.md                 # Setup guide + API reference + experiments</span>
 │
 <span class="d">├── app/</span>
-<span class="c">│   ├── main.py               # FastAPI app + all routes</span>
-<span class="c">│   ├── config.py             # Settings (pydantic-settings)</span>
+<span class="c">│   ├── __init__.py           # Makes app/ a Python package</span>
+<span class="c">│   ├── main.py               # FastAPI app + all 9 routes</span>
+<span class="c">│   ├── config.py             # Settings (pydantic-settings, reads .env)</span>
+<span class="c">│   ├── db.py                 # SQLite: chat_history + eval_results tables</span>
+<span class="c">│   ├── cache.py              # Redis: response cache (5 min TTL)</span>
 │   │
-<span class="d">│   ├── pipeline/</span>             <span class="c"># One folder = one RAG phase</span>
+<span class="d">│   ├── pipeline/</span>             <span class="c"># One file = one RAG phase</span>
+<span class="c">│   │   ├── __init__.py</span>
 <span class="c">│   │   ├── classifier.py     # Phase 0: Intent classification (gate before RAG)</span>
 <span class="c">│   │   ├── ingestion.py      # Phase 1: Load, parse, clean</span>
-<span class="c">│   │   ├── embedder.py       # Phase 2: Chunk + embed</span>
-<span class="c">│   │   ├── retriever.py      # Phase 3: Hybrid search + rerank</span>
+<span class="c">│   │   ├── embedder.py       # Phase 2: Chunk + OpenAI embed</span>
+<span class="c">│   │   ├── retriever.py      # Phase 3: Hybrid search + CrossEncoder rerank</span>
 <span class="c">│   │   ├── generator.py      # Phase 4: Prompt + LLM call</span>
 <span class="c">│   │   ├── evaluator.py      # Phase 5: RAGAS scoring</span>
-<span class="c">│   │   └── observer.py       # Phase 6: Trace & metrics</span>
+<span class="c">│   │   └── observer.py       # Phase 6: Trace & latency metrics</span>
 │   │
 <span class="d">│   ├── llm/</span>
-<span class="c">│   │   ├── base.py           # Abstract LLM interface</span>
-<span class="c">│   │   ├── ollama.py         # Ollama adapter</span>
-<span class="c">│   │   └── openai.py         # OpenAI adapter (drop-in swap)</span>
+<span class="c">│   │   ├── __init__.py</span>
+<span class="c">│   │   ├── base.py           # Abstract BaseLLM + get_llm() factory</span>
+<span class="c">│   │   ├── ollama.py         # Ollama adapter (local LLM)</span>
+<span class="c">│   │   └── openai_llm.py     # OpenAI adapter — named openai_llm.py, NOT openai.py</span>
+│   │                         <span class="c"># (openai.py would shadow the openai package)</span>
 │   │
-<span class="d">│   ├── agents/</span>
-<span class="c">│   │   └── rag_agent.py      # LangGraph workflow (4 nodes)</span>
-│   │
-<span class="c">│   ├── db.py                 # SQLite: chat history + eval logs</span>
-<span class="c">│   └── cache.py              # Redis: response cache</span>
+<span class="d">│   └── agents/</span>
+<span class="c">│       ├── __init__.py</span>
+<span class="c">│       └── rag_agent.py      # LangGraph workflow — 5 nodes + conditional edge</span>
 │
 <span class="d">├── ui/</span>
-<span class="c">│   ├── index.html            # Chat UI — shows retrieval trace</span>
-<span class="c">│   └── admin.html            # Admin: config + metrics dashboard</span>
+<span class="c">│   ├── index.html            # Chat UI — intent badge, chunks, RAGAS scores, prompt viewer</span>
+<span class="c">│   └── admin.html            # Admin: live param sliders, trace log, eval chart, history</span>
 │
 <span class="d">└── data/</span>
-<span class="c">    ├── uploads/              # User-uploaded documents</span>
-<span class="c">    └── rag_learn.db          # SQLite database</span></div>
+<span class="c">    ├── uploads/              # User-uploaded documents (git-ignored)</span>
+<span class="c">    └── rag_learn.db          # SQLite DB (auto-created on startup, git-ignored)</span></div>
 
   <div class="callout">
     <strong>Design rule:</strong> The <code>pipeline/</code> folder is the heart of the project. Each file is self-contained — you can read <code>retriever.py</code> alone and understand Phase 3 completely. This is intentional for learning.
@@ -679,22 +686,35 @@ services:
     volumes:
       - ./data:/app/data          <span class="cm"># persist SQLite + uploads</span>
     depends_on:
-      - qdrant
-      - redis
+      qdrant:                     <span class="cm"># wait until Qdrant passes its health check</span>
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: on-failure           <span class="cm"># auto-restart if the API crashes on startup</span>
 
-  qdrant:                          <span class="cm"># purpose-built vector DB</span>
+  qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant
     ports:
-      - "6333:6333"               <span class="cm"># REST API + web dashboard</span>
+      - "6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-  redis:                           <span class="cm"># response cache only</span>
+  redis:
     image: redis:7-alpine
     container_name: redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   qdrant_data:</pre>
@@ -714,16 +734,28 @@ OPENAI_EMBEDDING_MODEL=text-embedding-3-small  <span class="cm"># 1536-dim | alt
 QDRANT_HOST=http://qdrant:6333
 REDIS_HOST=redis
 
-<span class="cm"># RAG parameters (can be changed from Admin UI)</span>
+<span class="cm"># RAG parameters (can be changed from Admin UI at runtime)</span>
 CHUNK_SIZE=512
 CHUNK_OVERLAP=64
 TOP_K=10
 TOP_N=3
-HYBRID_ALPHA=0.5                  <span class="cm"># 0=BM25 only, 1=vector only, 0.5=balanced</span></pre>
+HYBRID_ALPHA=0.5                  <span class="cm"># 0=BM25 only, 1=vector only, 0.5=balanced</span>
+
+<span class="cm"># Feature flags</span>
+EVAL_ENABLED=true                 <span class="cm"># set to false to skip RAGAS during fast dev iteration</span></pre>
 
   <h3>Dockerfile</h3>
 <pre><span class="file-tag">Dockerfile</span>
 FROM python:3.11-slim
+
+<span class="cm"># System deps required by unstructured (PDF/DOCX parsing) and curl (healthcheck)</span>
+RUN apt-get update && apt-get install -y \
+    libmagic1 \
+    poppler-utils \
+    tesseract-ocr \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -732,32 +764,38 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload
 
   <h3>requirements.txt</h3>
 <pre><span class="file-tag">requirements.txt</span>
+<span class="cm"># API server</span>
 fastapi
 uvicorn[standard]
 pydantic-settings
 python-dotenv
 httpx
+aiofiles
+python-multipart          <span class="cm"># required for FastAPI file uploads (POST /upload)</span>
 
 <span class="cm"># RAG pipeline</span>
 langchain
+langchain-text-splitters  <span class="cm"># RecursiveCharacterTextSplitter lives here since langchain 0.2</span>
 langgraph
 qdrant-client
-sentence-transformers       <span class="cm"># reranker ONLY (CrossEncoder) — NOT used for embedding</span>
-rank-bm25                   <span class="cm"># BM25 sparse retrieval</span>
+sentence-transformers     <span class="cm"># reranker ONLY (CrossEncoder) — NOT used for embedding</span>
+rank-bm25                 <span class="cm"># BM25 sparse retrieval</span>
+numpy                     <span class="cm"># required by rank-bm25 and retriever argsort</span>
 
 <span class="cm"># Document parsing</span>
 unstructured[pdf,docx]
-pymupdf
+pymupdf                   <span class="cm"># fitz — best PDF text extractor</span>
+python-docx               <span class="cm"># docx parsing</span>
 
 <span class="cm"># LLM + Embedding clients (one package covers both)</span>
-openai                      <span class="cm"># text-embedding-3-small for embed, gpt-4o-mini for LLM</span>
+openai                    <span class="cm"># text-embedding-3-small for embed, gpt-4o-mini for LLM</span>
 
 <span class="cm"># Evaluation</span>
 ragas
+datasets                  <span class="cm"># required by ragas (Dataset.from_dict)</span>
 
 <span class="cm"># Cache & DB</span>
-redis
-aiofiles</pre>
+redis</pre>
 </section>
 
 <!-- ===== PHASE 0 ===== -->
@@ -1983,12 +2021,300 @@ embedder = Embedder()
 <!-- ===== MISSING FILES ===== -->
 <section id="missing-files">
   <div class="section-label" style="color:var(--muted)">Supporting Files</div>
-  <h2>Remaining Files — Complete Code</h2>
-  <p>These files are called throughout the project but their full code was not shown yet. Every one of them is required for the project to run.</p>
+  <h2>All Supporting Files — Complete &amp; Verified Code</h2>
+  <p>Every file below was runtime-tested. Two bugs were found and fixed during testing — noted inline where they occur.</p>
 
   <!-- config.py -->
   <h3>app/config.py</h3>
-  <p>Single source of truth for all settings. Uses <code>pydantic-settings</code> which auto-reads from the <code>.env</code> file and validates types. Any part of the app imports <code>settings</code> from here — never reads <code>os.getenv()</code> directly.</p>
+  <p>Single source of truth for all settings. <code>pydantic-settings</code> auto-reads the <code>.env</code> file, validates types, and sets defaults. Every other file imports <code>settings</code> from here — no direct <code>os.getenv()</code> calls anywhere else.</p>
+<pre><span class="file-tag">app/config.py</span>
+<span class="kw">from</span> pydantic_settings <span class="kw">import</span> BaseSettings
+
+<span class="kw">class</span> <span class="cl">Settings</span>(BaseSettings):
+    <span class="cm"># LLM</span>
+    LLM_PROVIDER:           <span class="cl">str</span>   = <span class="st">"ollama"</span>
+    OLLAMA_HOST:            <span class="cl">str</span>   = <span class="st">"http://host.docker.internal:11434"</span>
+    OLLAMA_MODEL:           <span class="cl">str</span>   = <span class="st">"llama3"</span>
+    OPENAI_API_KEY:         <span class="cl">str</span>   = <span class="st">""</span>
+    OPENAI_MODEL:           <span class="cl">str</span>   = <span class="st">"gpt-4o-mini"</span>
+    OPENAI_EMBEDDING_MODEL: <span class="cl">str</span>   = <span class="st">"text-embedding-3-small"</span>
+
+    <span class="cm"># Services</span>
+    QDRANT_HOST:            <span class="cl">str</span>   = <span class="st">"http://qdrant:6333"</span>
+    REDIS_HOST:             <span class="cl">str</span>   = <span class="st">"redis"</span>
+
+    <span class="cm"># RAG pipeline parameters — all hot-swappable via Admin UI</span>
+    CHUNK_SIZE:             <span class="cl">int</span>   = <span class="num">512</span>
+    CHUNK_OVERLAP:          <span class="cl">int</span>   = <span class="num">64</span>
+    TOP_K:                  <span class="cl">int</span>   = <span class="num">10</span>
+    TOP_N:                  <span class="cl">int</span>   = <span class="num">3</span>
+    HYBRID_ALPHA:           <span class="cl">float</span> = <span class="num">0.5</span>
+
+    <span class="cm"># Feature flags</span>
+    EVAL_ENABLED:           <span class="cl">bool</span>  = <span class="kw">True</span>
+
+    <span class="kw">class</span> <span class="cl">Config</span>:
+        env_file = <span class="st">".env"</span>
+        extra    = <span class="st">"ignore"</span>   <span class="cm"># ignore unknown keys in .env</span>
+
+settings = Settings()
+<span class="cm"># Usage: from app.config import settings → settings.TOP_K, settings.OPENAI_API_KEY, etc.</span></pre>
+
+  <!-- db.py -->
+  <h3>app/db.py</h3>
+  <p>SQLite persistence. Two tables: <code>chat_history</code> (every question + answer) and <code>eval_results</code> (RAGAS scores per query). The admin dashboard reads both.</p>
+  <div class="callout warn">
+    <strong>Bug fixed:</strong> Original used <code>ORDER BY created DESC</code>. Two inserts within the same second produce identical <code>CURRENT_TIMESTAMP</code> values, making order non-deterministic. Fixed to <code>ORDER BY id DESC</code> — always strictly ordered by insertion sequence.
+  </div>
+<pre><span class="file-tag">app/db.py</span>
+<span class="kw">import</span> sqlite3
+<span class="kw">from</span> pathlib <span class="kw">import</span> Path
+
+DB_PATH = <span class="st">"data/rag_learn.db"</span>
+
+<span class="kw">def</span> <span class="fn">_connect</span>() -> sqlite3.Connection:
+    Path(<span class="st">"data"</span>).mkdir(exist_ok=<span class="kw">True</span>)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row   <span class="cm"># rows behave like dicts</span>
+    <span class="kw">return</span> conn
+
+<span class="kw">def</span> <span class="fn">init_db</span>():
+    <span class="cm">"""Create tables on startup. Called once by @app.on_event('startup')."""</span>
+    conn = _connect()
+    conn.executescript(<span class="st">"""
+        CREATE TABLE IF NOT EXISTS chat_history (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            question  TEXT NOT NULL,
+            answer    TEXT NOT NULL,
+            intent    TEXT,
+            cached    INTEGER DEFAULT 0,
+            created   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS eval_results (
+            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            question           TEXT NOT NULL,
+            answer             TEXT NOT NULL,
+            faithfulness       REAL,
+            answer_relevancy   REAL,
+            context_precision  REAL,
+            created            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """</span>)
+    conn.commit()
+    conn.close()
+
+<span class="kw">def</span> <span class="fn">save_chat</span>(question: <span class="cl">str</span>, answer: <span class="cl">str</span>, intent: <span class="cl">str</span> = <span class="st">""</span>, cached: <span class="cl">bool</span> = <span class="kw">False</span>):
+    conn = _connect()
+    conn.execute(
+        <span class="st">"INSERT INTO chat_history (question, answer, intent, cached) VALUES (?,?,?,?)"</span>,
+        (question, answer, intent, int(cached))
+    )
+    conn.commit()
+    conn.close()
+
+<span class="kw">def</span> <span class="fn">save_eval_result</span>(question: <span class="cl">str</span>, answer: <span class="cl">str</span>, scores: <span class="cl">dict</span>):
+    conn = _connect()
+    conn.execute(
+        <span class="st">"""INSERT INTO eval_results
+           (question, answer, faithfulness, answer_relevancy, context_precision)
+           VALUES (?,?,?,?,?)"""</span>,
+        (question, answer,
+         scores.get(<span class="st">"faithfulness"</span>),
+         scores.get(<span class="st">"answer_relevancy"</span>),
+         scores.get(<span class="st">"context_precision"</span>))
+    )
+    conn.commit()
+    conn.close()
+
+<span class="kw">def</span> <span class="fn">get_history</span>(limit: <span class="cl">int</span> = <span class="num">50</span>) -> <span class="cl">list</span>[<span class="cl">dict</span>]:
+    conn = _connect()
+    rows = conn.execute(
+        <span class="st">"SELECT * FROM chat_history ORDER BY id DESC LIMIT ?"</span>, (limit,)
+        <span class="cm"># id DESC not created DESC — two inserts in same second are otherwise unordered</span>
+    ).fetchall()
+    conn.close()
+    <span class="kw">return</span> [dict(r) <span class="kw">for</span> r <span class="kw">in</span> rows]
+
+<span class="kw">def</span> <span class="fn">get_eval_history</span>(limit: <span class="cl">int</span> = <span class="num">100</span>) -> <span class="cl">list</span>[<span class="cl">dict</span>]:
+    conn = _connect()
+    rows = conn.execute(
+        <span class="st">"SELECT * FROM eval_results ORDER BY id DESC LIMIT ?"</span>, (limit,)
+    ).fetchall()
+    conn.close()
+    <span class="kw">return</span> [dict(r) <span class="kw">for</span> r <span class="kw">in</span> rows]</pre>
+
+  <!-- cache.py -->
+  <h3>app/cache.py</h3>
+  <p>Redis-based response cache. Identical questions skip the full pipeline and return instantly. TTL is 300 seconds. Silently degrades if Redis is unavailable — the app keeps working.</p>
+  <div class="callout warn">
+    <strong>Bug fixed:</strong> Original used <code>except redis.RedisError</code>. When <code>redis</code> is mocked in tests, <code>redis.RedisError</code> becomes a <code>MagicMock</code> object — not a real exception class — causing <code>TypeError: catching classes that do not inherit from BaseException</code>. More importantly, a cache that crashes the app on any unexpected error is wrong by design. Fixed to <code>except Exception</code>.
+  </div>
+<pre><span class="file-tag">app/cache.py</span>
+<span class="kw">import</span> json
+<span class="kw">import</span> redis
+<span class="kw">from</span> app.config <span class="kw">import</span> settings
+
+_client = redis.Redis(host=settings.REDIS_HOST, port=<span class="num">6379</span>, decode_responses=<span class="kw">True</span>)
+CACHE_TTL = <span class="num">300</span>   <span class="cm"># seconds — 5 minutes</span>
+
+<span class="kw">def</span> <span class="fn">get_cache</span>(key: <span class="cl">str</span>) -> <span class="cl">dict</span> | <span class="kw">None</span>:
+    <span class="kw">try</span>:
+        raw = _client.get(key)
+        <span class="kw">return</span> json.loads(raw) <span class="kw">if</span> raw <span class="kw">else None</span>
+    <span class="kw">except</span> <span class="cl">Exception</span>:
+        <span class="kw">return None</span>   <span class="cm"># treat any Redis failure as a cache miss — never crash the app</span>
+
+<span class="kw">def</span> <span class="fn">set_cache</span>(key: <span class="cl">str</span>, value: <span class="cl">dict</span>):
+    <span class="kw">try</span>:
+        _client.setex(key, CACHE_TTL, json.dumps(value))
+    <span class="kw">except</span> <span class="cl">Exception</span>:
+        <span class="kw">pass</span>   <span class="cm"># non-fatal</span>
+
+<span class="kw">def</span> <span class="fn">clear_cache</span>():
+    <span class="cm">"""Called after re-indexing documents so stale answers don't get served."""</span>
+    <span class="kw">try</span>:
+        _client.flushdb()
+    <span class="kw">except</span> <span class="cl">Exception</span>:
+        <span class="kw">pass</span></pre>
+
+  <!-- llm/base.py -->
+  <h3>app/llm/base.py</h3>
+  <p>The abstract interface. <code>get_llm()</code> is a factory that reads <code>LLM_PROVIDER</code> from settings and returns the right adapter. The pipeline never knows which LLM is active.</p>
+<pre><span class="file-tag">app/llm/base.py</span>
+<span class="kw">from</span> abc <span class="kw">import</span> ABC, abstractmethod
+
+<span class="kw">class</span> <span class="cl">BaseLLM</span>(ABC):
+    @abstractmethod
+    <span class="kw">def</span> <span class="fn">generate</span>(self, prompt: <span class="cl">str</span>) -> <span class="cl">str</span>: ...
+
+    @abstractmethod
+    <span class="kw">def</span> <span class="fn">generate_stream</span>(self, prompt: <span class="cl">str</span>): ...  <span class="cm"># generator — yields one token at a time</span>
+
+<span class="kw">def</span> <span class="fn">get_llm</span>() -> <span class="cl">BaseLLM</span>:
+    <span class="kw">from</span> app.config <span class="kw">import</span> settings
+    <span class="kw">if</span> settings.LLM_PROVIDER == <span class="st">"openai"</span>:
+        <span class="kw">from</span> app.llm.openai_llm <span class="kw">import</span> OpenAILLM   <span class="cm"># openai_llm.py NOT openai.py</span>
+        <span class="kw">return</span> OpenAILLM()
+    <span class="kw">else</span>:
+        <span class="kw">from</span> app.llm.ollama <span class="kw">import</span> OllamaLLM
+        <span class="kw">return</span> OllamaLLM()</pre>
+
+  <div class="callout warn">
+    <strong>Critical naming:</strong> The OpenAI adapter is named <code>openai_llm.py</code>, not <code>openai.py</code>. If you named it <code>openai.py</code>, Python's import system would shadow the <code>openai</code> package itself — every <code>from openai import OpenAI</code> statement across the entire project would fail with a circular import error.
+  </div>
+
+  <!-- openai_llm.py -->
+  <h3>app/llm/openai_llm.py</h3>
+<pre><span class="file-tag">app/llm/openai_llm.py</span>
+<span class="kw">from</span> openai <span class="kw">import</span> OpenAI
+<span class="kw">from</span> app.config <span class="kw">import</span> settings
+<span class="kw">from</span> app.llm.base <span class="kw">import</span> BaseLLM
+
+<span class="kw">class</span> <span class="cl">OpenAILLM</span>(BaseLLM):
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.model  = settings.OPENAI_MODEL
+
+    <span class="kw">def</span> <span class="fn">generate</span>(self, prompt: <span class="cl">str</span>) -> <span class="cl">str</span>:
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: prompt}],
+            temperature=<span class="num">0.2</span>,
+        )
+        <span class="kw">return</span> response.choices[<span class="num">0</span>].message.content
+
+    <span class="kw">def</span> <span class="fn">generate_stream</span>(self, prompt: <span class="cl">str</span>):
+        stream = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: prompt}],
+            temperature=<span class="num">0.2</span>,
+            stream=<span class="kw">True</span>,
+        )
+        <span class="kw">for</span> chunk <span class="kw">in</span> stream:
+            token = chunk.choices[<span class="num">0</span>].delta.content
+            <span class="kw">if</span> token:
+                <span class="kw">yield</span> token</pre>
+
+  <!-- main.py startup hook -->
+  <h3>app/main.py — startup hook</h3>
+  <p><code>init_db()</code> must be called on startup to create the SQLite tables before any request arrives. <code>save_chat()</code> must be called after every <code>/ask</code> response to populate the admin history table. <code>DELETE /admin/cache</code> wipes Redis after re-indexing. The full <code>main.py</code> incorporating all changes is provided as a separate downloadable file.</p>
+<pre><span class="file-tag">app/main.py — key additions</span>
+<span class="kw">from</span> app.db <span class="kw">import</span> init_db, get_history, get_eval_history, save_chat
+<span class="kw">from</span> app.cache <span class="kw">import</span> get_cache, set_cache, clear_cache
+
+@app.on_event(<span class="st">"startup"</span>)
+<span class="kw">async def</span> on_startup():
+    init_db()   <span class="cm"># creates tables if missing — must run before first request</span>
+
+@app.get(<span class="st">"/ask"</span>)
+<span class="kw">async def</span> ask(q: <span class="cl">str</span>):
+    <span class="cm"># ... pipeline runs ...</span>
+    save_chat(q, response[<span class="st">"answer"</span>], intent=response[<span class="st">"intent"</span>])  <span class="cm"># persist to SQLite</span>
+    <span class="kw">return</span> response
+
+@app.delete(<span class="st">"/admin/cache"</span>)
+<span class="kw">async def</span> delete_cache():
+    <span class="cm">"""Wipe Redis cache — call after re-uploading documents."""</span>
+    clear_cache()
+    <span class="kw">return</span> {<span class="st">"status"</span>: <span class="st">"cache cleared"</span>}</pre>
+
+  <!-- New files: .gitignore, .env.example, README.md -->
+  <h3>.gitignore</h3>
+<pre><span class="file-tag">.gitignore</span>
+<span class="cm"># Environment — never commit real keys</span>
+.env
+
+<span class="cm"># Python</span>
+__pycache__/
+*.pyc
+
+<span class="cm"># Virtual environments</span>
+.venv/
+venv/
+
+<span class="cm"># Data — runtime artifacts, not source code</span>
+data/rag_learn.db
+data/uploads/*
+!data/uploads/.gitkeep
+
+<span class="cm"># Qdrant volume</span>
+qdrant_data/
+
+<span class="cm"># IDE / OS</span>
+.vscode/
+.idea/
+.DS_Store</pre>
+
+  <h3>.env.example</h3>
+  <p>Safe template committed to git. Copy to <code>.env</code> and fill in real values. Never commit <code>.env</code> itself.</p>
+<pre><span class="file-tag">.env.example</span>
+<span class="cm"># Copy this file: cp .env.example .env</span>
+
+LLM_PROVIDER=ollama
+OLLAMA_HOST=http://host.docker.internal:11434
+OLLAMA_MODEL=llama3
+
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+
+QDRANT_HOST=http://qdrant:6333
+REDIS_HOST=redis
+
+CHUNK_SIZE=512
+CHUNK_OVERLAP=64
+TOP_K=10
+TOP_N=3
+HYBRID_ALPHA=0.5
+EVAL_ENABLED=true</pre>
+
+  <h3>README.md — key sections</h3>
+  <p>Full README is included in the project zip. Key sections: quick start, architecture diagram, API reference table, learning experiments table, switching LLM provider, switching embedding model, and troubleshooting.</p>
+  <div class="callout tip">
+    <strong>After changing embedding model:</strong> Delete the Qdrant collection via http://localhost:6333/dashboard, re-upload all documents, then call <code>DELETE /admin/cache</code> to wipe stale cached answers.
+  </div>
+</section>
 <pre><span class="file-tag">app/config.py</span>
 <span class="kw">from</span> pydantic_settings <span class="kw">import</span> BaseSettings
 
