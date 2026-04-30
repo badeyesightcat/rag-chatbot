@@ -1,14 +1,15 @@
 import sqlite3
 from pathlib import Path
-import json
 
 DB_PATH = "data/rag_learn.db"
 
-def _connect():
+
+def _connect() -> sqlite3.Connection:
     Path("data").mkdir(exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row # rows behave like dicts
+    conn.row_factory = sqlite3.Row   # rows behave like dicts
     return conn
+
 
 def init_db():
     """Create tables if they don't exist. Called once on startup."""
@@ -36,6 +37,7 @@ def init_db():
     conn.commit()
     conn.close()
 
+
 def save_chat(question: str, answer: str, intent: str = "", cached: bool = False):
     conn = _connect()
     conn.execute(
@@ -45,30 +47,37 @@ def save_chat(question: str, answer: str, intent: str = "", cached: bool = False
     conn.commit()
     conn.close()
 
-def save_eval_results(question: str, answer: str, scores: dict):
+
+def save_eval_result(question: str, answer: str, scores: dict):
     conn = _connect()
     conn.execute(
         """INSERT INTO eval_results
            (question, answer, faithfulness, answer_relevancy, context_precision)
            VALUES (?,?,?,?,?)""",
-        (question, answer, scores.get("faithfulness"), scores.get("answer_relevancy"), scores.get("context_precision"))
+        (
+            question, answer,
+            scores.get("faithfulness"),
+            scores.get("answer_relevancy"),
+            scores.get("context_precision"),
+        )
     )
     conn.commit()
     conn.close()
 
+
 def get_history(limit: int = 50) -> list[dict]:
-    """Returns recent chat history for admin dashboard."""
     conn = _connect()
     rows = conn.execute(
-        "SELECT * FROM chat_history ORDER BY created DESC LIMIT ?",
-        (limit,)
+        "SELECT * FROM chat_history ORDER BY created DESC LIMIT ?", (limit,)
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
+
 def get_eval_history(limit: int = 100) -> list[dict]:
-    """Returns RAGAS scores over time — plotted as line chart in admin."""
     conn = _connect()
-    rows = conn.execute("SELECT * FROM eval_results ORDER BY created DESC LIMIT ?", (limit,)).fetchall()
+    rows = conn.execute(
+        "SELECT * FROM eval_results ORDER BY created DESC LIMIT ?", (limit,)
+    ).fetchall()
     conn.close()
     return [dict(r) for r in rows]

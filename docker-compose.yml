@@ -8,24 +8,37 @@ services:
       - "8000:8000"
     env_file: .env
     volumes:
-      - ./data:/app/data          # persist SQLite + uploads
+      - ./data:/app/data
     depends_on:
-      - qdrant
-      - redis
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: on-failure
 
-  qdrant:                          # purpose-built vector DB
+  qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant
     ports:
-      - "6333:6333"               # REST API + web dashboard
+      - "6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-  redis:                           # response cache only
+  redis:
     image: redis:7-alpine
     container_name: redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   qdrant_data:

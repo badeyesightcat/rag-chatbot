@@ -38,8 +38,8 @@ from app.pipeline.embedder import Embedder
 from app.pipeline.classifier import IntentClassifier
 from app.pipeline.retriever import Retriever
 from app.pipeline.generator import Generator
-from app.pipeline.observer import get_traces
 from app.agents.rag_agent import run_rag
+from app.pipeline.observer import get_traces
 from app.llm.base import get_llm
 from app.db import init_db, get_history, get_eval_history, save_chat
 from app.config import settings

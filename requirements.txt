@@ -1,26 +1,32 @@
+# API server
 fastapi
 uvicorn[standard]
 pydantic-settings
 python-dotenv
 httpx
+aiofiles
+python-multipart
 
 # RAG pipeline
 langchain
+langchain-text-splitters
 langgraph
 qdrant-client
-sentence-transformers       # reranker ONLY (CrossEncoder) — NOT used for embedding
-rank-bm25                   # BM25 sparse retrieval
+sentence-transformers
+rank-bm25
+numpy
 
 # Document parsing
 unstructured[pdf,docx]
 pymupdf
+python-docx
 
-# LLM + Embedding clients (one package covers both)
-openai                      # text-embedding-3-small for embed, gpt-4o-mini for LLM
+# LLM + Embedding (one package for both)
+openai
 
 # Evaluation
 ragas
+datasets
 
 # Cache & DB
 redis
-aiofiles
